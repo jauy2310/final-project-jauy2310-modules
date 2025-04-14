@@ -1,0 +1,1 @@
+savedcmd_/home/jauy2310/Desktop/final-project-jauy2310-modules/ws2812/ws2812.ko := ld -r -m elf_x86_64 -z noexecstack --build-id=sha1  -T scripts/module.lds -o /home/jauy2310/Desktop/final-project-jauy2310-modules/ws2812/ws2812.ko /home/jauy2310/Desktop/final-project-jauy2310-modules/ws2812/ws2812.o /home/jauy2310/Desktop/final-project-jauy2310-modules/ws2812/ws2812.mod.o

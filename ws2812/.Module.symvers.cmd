@@ -1,0 +1,1 @@
+savedcmd_/home/jauy2310/Desktop/final-project-jauy2310-modules/ws2812/Module.symvers :=  scripts/mod/modpost -M -m -a      -o /home/jauy2310/Desktop/final-project-jauy2310-modules/ws2812/Module.symvers -T /home/jauy2310/Desktop/final-project-jauy2310-modules/ws2812/modules.order -i Module.symvers -e 

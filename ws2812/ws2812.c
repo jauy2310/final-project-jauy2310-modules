@@ -20,7 +20,7 @@ static int hello_init(void) {
  * 
  * Testing the unload of a module
  */
-static int hello_exit(void) {
+static void hello_exit(void) {
     printk(KERN_ALERT "Goodbye, cruel world (jauy2310)\n");
 }
 
