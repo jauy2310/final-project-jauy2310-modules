@@ -11,7 +11,7 @@ MODULE_LICENSE("Dual BSD/GPL");
  * Testing the load/unload of a module
  */
 static int hello_init(void) {
-    printk(KERN_ALERT "Hello, world (jauy2310)\n");
+    printk(KERN_ALERT "Hello, world (jauy2310 - final project)\n");
     return 0;
 }
 
@@ -21,7 +21,7 @@ static int hello_init(void) {
  * Testing the unload of a module
  */
 static void hello_exit(void) {
-    printk(KERN_ALERT "Goodbye, cruel world (jauy2310)\n");
+    printk(KERN_ALERT "Goodbye, cruel world (jauy2310 - final project)\n");
 }
 
 /**
