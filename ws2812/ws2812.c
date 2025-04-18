@@ -37,13 +37,14 @@ struct file_operations fops = {
  * Loading the module
  */
 static int ws2812_init(void) {
-    // test - modify this to verify the latest load of the module
-    printk(KERN_INFO "Hello, world (jauy2310 - final project)\n");
+    // start driver load
+    LOG("Starting WS2812B LED Kernel Module Load.");
 
     // register this module as a char device
 
 
     // return
+    LOG("WS2812B LED Kernel Module Loaded!");
     return 0;
 }
 
@@ -53,7 +54,11 @@ static int ws2812_init(void) {
  * Unloading the module
  */
 static void ws2812_exit(void) {
-    printk(KERN_INFO "Goodbye, cruel world (jauy2310 - final project)\n");
+    // start driver cleanup
+    LOG("Cleaning up WS2812B LED Kernel Module.");
+    
+    // function complete
+    LOG("WS2812B LED Kernel Module Cleaned Up!");
 }
 
 /**
