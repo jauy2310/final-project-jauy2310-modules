@@ -1,5 +1,7 @@
 {
     "files.associations": {
-        "module.h": "c"
+        "module.h": "c",
+        "ws2812.h": "c",
+        "types.h": "c"
     }
 }
