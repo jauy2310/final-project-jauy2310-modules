@@ -96,6 +96,13 @@ static int ws2812_init(void) {
 static void ws2812_exit(void) {
     // start driver cleanup
     LOG("Cleaning up WS2812B LED Kernel Module.");
+
+    // get device info
+    dev_t devno = MKDEV(ws2812_major, ws2812_minor);
+
+    // delete and unregister device
+    cdev_del(&ws2812_dev.cdev);
+    unregister_chrdev_region(devno, 1);
     
     // function complete
     LOG("WS2812B LED Kernel Module Cleaned Up!");
