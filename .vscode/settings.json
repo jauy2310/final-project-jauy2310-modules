@@ -2,6 +2,7 @@
     "files.associations": {
         "module.h": "c",
         "ws2812.h": "c",
-        "types.h": "c"
+        "types.h": "c",
+        "led.h": "c"
     }
 }

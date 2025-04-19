@@ -1,4 +1,4 @@
-#include "ws2812.h"
+#include "ws2812_driver.h"
 
 /**************************************************************************************
  * KERNEL MODULE DECLARATIONS/DEFINITIONS
@@ -66,6 +66,14 @@ static int ws2812_init(void) {
     int result = 0;
     dev_t dev = 0;
 
+    /*****************************
+     * INITIALIZE STRUCTS
+     *****************************/
+
+    /*****************************
+     * REGISTER DEVICE
+     *****************************/
+
     // register this module as a char device and clear device memory region
     result = alloc_chrdev_region(&dev, ws2812_minor, 1, WS2812_MODULE_NAME);
     ws2812_major = MAJOR(dev);
@@ -96,6 +104,17 @@ static int ws2812_init(void) {
 static void ws2812_exit(void) {
     // start driver cleanup
     LOG("Cleaning up WS2812B LED Kernel Module.");
+
+    /*****************************
+     * FREE STRUCTS
+     *****************************/
+    LOG("> De-initializing LED list...");
+    free_led(ws2812_dev.strip);
+    ws2812_dev.strip = NULL;
+
+    /*****************************
+     * UNREGISTER DEVICE
+     *****************************/
 
     // get device info
     dev_t devno = MKDEV(ws2812_major, ws2812_minor);
