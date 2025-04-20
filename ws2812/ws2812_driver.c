@@ -74,8 +74,14 @@ static int ws2812_init(void) {
      *****************************/
     // get the GPIO descriptor for the GPIO pin to use
     gpio_desc = gpio_to_desc(12);
-    if (IS_ERR(gpio_desc)) {
+    if (gpio_desc == NULL) {
         LOGE("Error getting GPIO descriptor for GPIO12: %ld\n", PTR_ERR(gpio_desc));
+        return -1;
+    }
+
+    result = gpio_direction_output(gpio_desc, 0);
+    if (status) {
+        LOGE("Error setting GPIO direction for GPIO12 (%d)", result);
         return -1;
     }
 
