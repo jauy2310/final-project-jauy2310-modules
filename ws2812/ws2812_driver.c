@@ -79,9 +79,6 @@ static int ws2812_init(void) {
         return -EINVAL;
     }
 
-    // set the GPIO name
-    gpiod_set_consumer_name(gpio_desc, WS2812_MODULE_NAME);
-
     result = gpiod_direction_output(gpio_desc, 0);
     if (result) {
         LOGE("Error setting GPIO direction for GPIO12 (%d)", result);
