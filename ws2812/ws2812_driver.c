@@ -15,6 +15,9 @@ int ws2812_minor = 0;
 // global device definition
 struct ws2812_dev ws2812_dev;
 
+// global gpio definitions
+static struct gpio_desc *gpio_desc;
+
 /**************************************************************************************
  * MODULE IMPLEMENTATION
  **************************************************************************************/
@@ -67,8 +70,14 @@ static int ws2812_init(void) {
     dev_t dev = 0;
 
     /*****************************
-     * INITIALIZE STRUCTS
+     * INITIALIZE
      *****************************/
+    // get the GPIO descriptor for the GPIO pin to use
+    gpio_desc = gpiod_get(NULL, "gpio12", GPIOD_OUT_LOW);
+    if (IS_ERR(gpio_desc)) {
+        LOGE("Error getting GPIO descriptor.");
+        return -1;
+    }
 
     /*****************************
      * REGISTER DEVICE
@@ -85,6 +94,12 @@ static int ws2812_init(void) {
 
     // setup cdev
     result = ws2812_setup_cdev(&ws2812_dev);
+
+    /*****************************
+     * ADDITIONAL ACTIONS
+     *****************************/
+    // turn on gpio
+    gpiod_set_value(gpio_desc, 1);
 
     // return
     if (result) {
@@ -106,11 +121,21 @@ static void ws2812_exit(void) {
     LOG("Cleaning up WS2812B LED Kernel Module.");
 
     /*****************************
-     * FREE STRUCTS
+     * PRE-ACTIONS
      *****************************/
+    // turn off LED
+    gpiod_set_value(gpio_desc, 0);
+
+    /*****************************
+     * DEINITIALIZE
+     *****************************/
+    // free the LED struct
     LOG("> De-initializing LED list...");
     free_led(ws2812_dev.strip);
     ws2812_dev.strip = NULL;
+
+    // free the GPIO descriptor
+    gpiod_put(gpio_desc);
 
     /*****************************
      * UNREGISTER DEVICE

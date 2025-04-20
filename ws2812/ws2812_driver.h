@@ -19,6 +19,7 @@
 #include <linux/types.h>
 #include <linux/cdev.h>
 #include <linux/fs.h>
+#include <linux/gpio/consumer.h>
 
 // local includes
 #include "log.h"
