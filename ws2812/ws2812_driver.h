@@ -33,6 +33,7 @@
 
 // define module name
 #define WS2812_MODULE_NAME "ws2812"
+#define WS2812_GPIO_PIN 12
 
 /**************************************************************************************
  * STRUCTS
