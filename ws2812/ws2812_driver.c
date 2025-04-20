@@ -79,8 +79,8 @@ static int ws2812_init(void) {
         return -1;
     }
 
-    result = gpio_direction_output(gpio_desc, 0);
-    if (status) {
+    result = gpiod_direction_output(gpio_desc, 0);
+    if (result) {
         LOGE("Error setting GPIO direction for GPIO12 (%d)", result);
         return -1;
     }
