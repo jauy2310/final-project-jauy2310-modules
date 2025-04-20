@@ -75,13 +75,13 @@ static int ws2812_init(void) {
     // get the GPIO descriptor for the GPIO pin to use
     gpio_desc = gpio_to_desc(WS2812_GPIO_PIN);
     if (gpio_desc == NULL) {
-        LOGE("Error getting GPIO descriptor for GPIO%d: %ld\n", WS2812_GPIO_PIN, PTR_ERR(gpio_desc));
+        LOGE("> Error getting GPIO descriptor for GPIO%d: %ld\n", WS2812_GPIO_PIN, PTR_ERR(gpio_desc));
         return -EINVAL;
     }
 
     result = gpiod_direction_output(gpio_desc, 0);
     if (result) {
-        LOGE("Error setting GPIO direction for GPIO12 (%d)", result);
+        LOGE("> Error setting GPIO direction for GPIO12 (%d)", result);
         return result;
     }
 
@@ -93,7 +93,7 @@ static int ws2812_init(void) {
     result = alloc_chrdev_region(&dev, ws2812_minor, 1, WS2812_MODULE_NAME);
     ws2812_major = MAJOR(dev);
     if (result < 0) {
-        LOGW("Can't get major %d\n", ws2812_major);
+        LOGW("> Can't get major %d\n", ws2812_major);
         return result;
     }
     memset(&ws2812_dev, 0, sizeof(struct ws2812_dev));
