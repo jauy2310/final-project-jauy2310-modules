@@ -73,9 +73,9 @@ static int ws2812_init(void) {
      * INITIALIZE
      *****************************/
     // get the GPIO descriptor for the GPIO pin to use
-    gpio_desc = gpiod_get(NULL, "gpio12", GPIOD_OUT_LOW);
+    gpio_desc = gpiod_get_index(NULL, "gpio", 12, GPIOD_OUT_LOW);
     if (IS_ERR(gpio_desc)) {
-        LOGE("Error getting GPIO descriptor.");
+        LOGE("Error getting GPIO descriptor for GPIO12: %ld\n", PTR_ERR(gpio_desc));
         return -1;
     }
 
