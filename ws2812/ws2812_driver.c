@@ -56,11 +56,6 @@ static void ws2812_exit(void) {
     /*****************************
      * DEINITIALIZE
      *****************************/
-
-    /*****************************
-     * UNREGISTER DEVICE
-     *****************************/
-
     
     // function complete
     LOG("WS2812B LED Kernel Module Cleaned Up!");
