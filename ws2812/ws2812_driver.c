@@ -28,11 +28,11 @@ static int ws2812_init(void) {
     /*****************************
      * START MODULE ENTRY
      *****************************/
-    // start driver load
-    LOG("Starting WS2812B LED Kernel Module Load.");
-
     // initialization setup
     int result = 0;
+    
+    // start driver load
+    LOG("Starting WS2812B LED Kernel Module Load.");
 
     /*****************************
      * INITIALIZE
