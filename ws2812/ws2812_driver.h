@@ -13,13 +13,9 @@
 #endif
 
 // kernel module includes
+#include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/printk.h>
-#include <linux/types.h>
-#include <linux/cdev.h>
-#include <linux/fs.h>
-#include <linux/gpio/consumer.h>
 
 // local includes
 #include "log.h"
@@ -28,10 +24,7 @@
 /**************************************************************************************
  * MACROS/DEFINES
  **************************************************************************************/
-// define a debug flag
-#define DEBUG 1
-
-// define module name
+// define module information
 #define WS2812_MODULE_NAME "ws2812"
 #define WS2812_GPIO_PIN 18
 
@@ -39,15 +32,9 @@
  * STRUCTS
  **************************************************************************************/
 
-// device struct
-struct ws2812_dev {
-    struct led_node *strip;
-    struct cdev cdev;
-};
 
 /**************************************************************************************
  * MODULE LOAD/UNLOAD FUNCTION PROTOTYPES
  **************************************************************************************/
-static int ws2812_setup_cdev(struct ws2812_dev *dev);
 
 # endif /* _WS2812_H_ */

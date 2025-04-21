@@ -1,8 +1,15 @@
 #ifndef _LOG_H_
 #define _LOG_H_
 
+// include printk
+#include <linux/printk.h>
+
+// define a DEBUG flag
 #define DEBUG 1
 
+// define a set of LOG functions
+// uses printk for kernel and printf for user
+// if DEBUG is not set, ignore LOG statements
 #undef LOG
 #undef LOGW
 #ifdef DEBUG
