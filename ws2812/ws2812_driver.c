@@ -105,6 +105,9 @@ static int cm_configure(void) {
     // disable clocks and wait until ready
     REG_WRITE_FIELD(cm_pwmctl, BCM_CM_PASSWD_MASK | BCM_CM_PWMCTL_ENAB_MASK, BCM_CM_PASSWD | (0 << 4));
     while(*cm_pwmctl & BCM_CM_PWMCTL_BUSY_MASK);
+
+    // set divider
+    REG_WRITE_FIELD(cm_pwmdiv, BCM_CM_PASSWD_MASK | BCM_CM_PWMDIV_MASK, BCM_CM_PASSWD | 1 << 12);
     
     // enable clock with PLLD (source = 6)
     REG_WRITE_FIELD(cm_pwmctl, BCM_CM_PASSWD_MASK | BCM_CM_PWMCTL_SRC_MASK | BCM_CM_PWMCTL_ENAB_MASK,
