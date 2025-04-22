@@ -229,7 +229,6 @@ static int ws2812_init(void) {
     gpio_configure(WS2812_GPIO_PIN, GPFSEL_OUTPUT);
     cm_configure();
     pwm_configure();
-    gpio_set(WS2812_GPIO_PIN);
 
     /*****************************
      * RETURN
