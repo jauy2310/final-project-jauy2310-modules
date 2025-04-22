@@ -204,7 +204,7 @@ static int ws2812_init(void) {
         iounmap(gpio_registers);
         return -ENOMEM;
     } else {
-        LOG("> CM peripheral mapped in memory at 0x%p.", pwm_registers);
+        LOG("> CM peripheral mapped in memory at 0x%p.", cm_registers);
     }
 
 
