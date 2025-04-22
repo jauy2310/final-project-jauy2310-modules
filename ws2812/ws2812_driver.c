@@ -144,10 +144,10 @@ static int pwm_configure(void) {
     REG_WRITE_FIELD(pwm_dmac, BCM_PWM_DMAC_ENAB_MASK, 0);       // Disable DMA (TODO: change after testing)
 
     // configure RNG1 register
-    REG_WRITE_FIELD(pwm_rng1, BCM_PWM_RNG1_MASK, 0x0000000A);   // Set the RNG1 register to 0xA (=10)
+    REG_WRITE_FIELD(pwm_rng1, BCM_PWM_RNG1_MASK, 4096);   // Set the RNG1 register
     
     // configure DAT1 register
-    REG_WRITE_FIELD(pwm_dat1, BCM_PWM_DAT1_MASK, 0x00000007);   // Set the DAT1 register to 0x7 (=7)
+    REG_WRITE_FIELD(pwm_dat1, BCM_PWM_DAT1_MASK, 1024);   // Set the DAT1 register
 
     // configuration complete; enable PWM
     REG_WRITE_FIELD(pwm_ctl, BCM_PWM_CTL_PWEN1_MASK, 1);
