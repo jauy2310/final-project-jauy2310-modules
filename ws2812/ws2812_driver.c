@@ -16,6 +16,83 @@ static const struct proc_ops fops = {
 };
 
 /**************************************************************************************
+ * HELPER FUNCTIONS
+ **************************************************************************************/
+
+/**
+ * gpio_configure()
+ * 
+ * Configure the GPFSEL register in the GPIO peripheral
+ */
+static int gpio_configure(unsigned int pin, gpfsel_mode_t mode) {
+    // function setup
+    unsigned int *gpio_gpfseli;
+
+    // check that pins are within bounds
+    if (pin < 0 || pin > BCM_NUM_GPIO_PINS) {
+        LOGE("Error; cannot use GPIO pin outside of [0, %d]", BCM_NUM_GPIO_PINS);
+        return -EINVAL;
+    }
+
+    // create a pointer to the selected pin's GPIO register
+    // gpfsel registers each correspond to 10 pins each, using an offset at (pin / 10)
+    gpio_gpfseli = gpio_registers + (pin / 10);
+
+    // momentarily disable the GPIO, set the mode, and enable it again
+    *gpio_gpfseli &= ~(BCM_GPIO_GPFSELN_MASK(pin));
+    *gpio_gpfseli |= (BCM_GPIO_GPFSELN_SET(mode, pin));
+
+    // return success
+    return 0;
+}
+
+/**
+ * gpio_set()
+ * 
+ * Set a GPIO pin
+ */
+static int gpio_set(unsigned int pin) {
+    // check that pins are within bounds
+    if (pin < 0 || pin > BCM_NUM_GPIO_PINS) {
+        LOGE("Error; cannot use GPIO pin outside of [0, %d]", BCM_NUM_GPIO_PINS);
+        return -EINVAL;
+    }
+
+    // create a pointer to the selected pin's GPSET register
+    if (pin < 32) {
+        *BCM_GPIO_REG(BCM_GPIO_GPSET0) = BCM_GPIO_GPSETN_SET(1, pin);
+    } else {
+        *BCM_GPIO_REG(BCM_GPIO_GPSET1) = BCM_GPIO_GPSETN_SET(1, pin);
+    }
+
+    // return success
+    return 0;
+}
+
+/**
+ * gpio_clear()
+ * 
+ * Clear a GPIO pin
+ */
+static int gpio_clear(unsigned int pin) {
+    // check that pins are within bounds
+    if (pin < 0 || pin > BCM_NUM_GPIO_PINS) {
+        LOGE("Error; cannot use GPIO pin outside of [0, %d]", BCM_NUM_GPIO_PINS);
+        return -EINVAL;
+    }
+
+    // create a pointer to the selected pin's GPSET register
+    if (pin < 32) {
+        *BCM_GPIO_REG(BCM_GPIO_GPCLR0) = BCM_GPIO_GPSETN_SET(1, pin);
+    } else {
+        *BCM_GPIO_REG(BCM_GPIO_GPCLR1) = BCM_GPIO_GPSETN_SET(1, pin);
+    }
+
+    // return success
+    return 0;
+}
+
+/**************************************************************************************
  * MODULE LOAD/UNLOAD FUNCTIONS
  **************************************************************************************/
 
@@ -53,12 +130,19 @@ static int ws2812_init(void) {
     ws2812_proc = proc_create(WS2812_MODULE_NAME, 0666, NULL, &fops);
     if (ws2812_proc == NULL) {
         LOGE("> Unable to create entry in procfs.");
+        iounmap(gpio_registers);
         return -ENOMEM;
     } else {
         LOG("> Entry created for module at /proc/%s", WS2812_MODULE_NAME);
     }
 
-    
+    /*****************************
+     * POST-INIT ACTIONS
+     *****************************/
+    // configure GPIO and turn on an LED
+    gpio_configure(WS2812_GPIO_PIN, GPFSEL_OUTPUT);
+    gpio_set(WS2812_GPIO_PIN);
+
     /*****************************
      * RETURN
      *****************************/
@@ -77,6 +161,13 @@ static void ws2812_exit(void) {
      *****************************/
     // start driver cleanup
     LOG("Cleaning up WS2812B LED Kernel Module.");
+
+    /*****************************
+     * PRE-EXIT ACTIONS
+     *****************************/
+    // turn off an LED and configure GPIO to default
+    gpio_clear(WS2812_GPIO_PIN);
+    gpio_configure(WS2812_GPIO_PIN, GPFSEL_INPUT);
 
     /*****************************
      * UNREGISTER MODULE
