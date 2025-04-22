@@ -103,13 +103,9 @@ static int cm_configure(void) {
     unsigned int *cm_pwmdiv = BCM_CM_REG(BCM_CM_PWMDIV);
 
     // disable clocks and wait until ready
-    REG_WRITE_FIELD(cm_pwmctl, BCM_CM_PASSWD_MASK, 0 | BCM_CM_PASSWD);
+    REG_WRITE_FIELD(cm_pwmctl, BCM_CM_PASSWD_MASK | BCM_CM_PWMCTL_ENAB_MASK, BCM_CM_PASSWD | (0 << 4));
     while(*cm_pwmctl & BCM_CM_PWMCTL_BUSY_MASK);
     
-    // set divisor
-    REG_WRITE_FIELD(cm_pwmdiv, BCM_CM_PASSWD_MASK | BCM_CM_PWMDIV_MASK,
-                                BCM_CM_PASSWD | (WS2812_CLK_DIV << 12) | WS2812_CLK_DIV_FRAC);
-
     // enable clock with PLLD (source = 6)
     REG_WRITE_FIELD(cm_pwmctl, BCM_CM_PASSWD_MASK | BCM_CM_PWMCTL_SRC_MASK | BCM_CM_PWMCTL_ENAB_MASK,
                                 BCM_CM_PASSWD | 6 | 1 << 4);
@@ -139,7 +135,7 @@ static int pwm_configure(void) {
     
     // configure CTL register
     REG_WRITE_FIELD(pwm_ctl, BCM_PWM_CTL_MODE1_MASK, 0);        // PWM mode
-    REG_WRITE_FIELD(pwm_ctl, BCM_PWM_CTL_SBIT1_MASK, 1);        // Pull HIGH between transfers
+    REG_WRITE_FIELD(pwm_ctl, BCM_PWM_CTL_SBIT1_MASK, 0);        // Pull LOW between transfers (TODO: change after testing)
     REG_WRITE_FIELD(pwm_ctl, BCM_PWM_CTL_USEF1_MASK, 0);        // Disable FIFO (TODO: change after testing)
     REG_WRITE_FIELD(pwm_ctl, BCM_PWM_CTL_MSEN1_MASK, 1);        // Enable Mark-Space mode
 
