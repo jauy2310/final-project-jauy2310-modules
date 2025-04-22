@@ -114,6 +114,9 @@ static int cm_configure(void) {
     REG_WRITE_FIELD(cm_pwmctl, BCM_CM_PASSWD_MASK | BCM_CM_PWMCTL_SRC_MASK | BCM_CM_PWMCTL_ENAB_MASK,
                                 BCM_CM_PASSWD | 6 | 1 << 4);
 
+    // wait until ready
+    while(*cm_pwmctl & BCM_CM_PWMCTL_BUSY_MASK);          
+
     // return
     return 0;
 }
@@ -144,10 +147,10 @@ static int pwm_configure(void) {
     REG_WRITE_FIELD(pwm_dmac, BCM_PWM_DMAC_ENAB_MASK, 0);       // Disable DMA (TODO: change after testing)
 
     // configure RNG1 register
-    REG_WRITE_FIELD(pwm_rng1, BCM_PWM_RNG1_MASK, 4096);   // Set the RNG1 register
+    REG_WRITE_FIELD(pwm_rng1, BCM_PWM_RNG1_MASK, 1024);   // Set the RNG1 register
     
     // configure DAT1 register
-    REG_WRITE_FIELD(pwm_dat1, BCM_PWM_DAT1_MASK, 1024);   // Set the DAT1 register
+    REG_WRITE_FIELD(pwm_dat1, BCM_PWM_DAT1_MASK, 256);   // Set the DAT1 register
 
     // configuration complete; enable PWM
     REG_WRITE_FIELD(pwm_ctl, BCM_PWM_CTL_PWEN1_MASK, 1);
@@ -226,7 +229,7 @@ static int ws2812_init(void) {
      * POST-INIT ACTIONS
      *****************************/
     // configure GPIO and turn on an LED
-    gpio_configure(WS2812_GPIO_PIN, GPFSEL_OUTPUT);
+    gpio_configure(WS2812_GPIO_PIN, GPFSEL_ALT5);
     cm_configure();
     pwm_configure();
 
