@@ -45,11 +45,11 @@
 #define CM_BASE_ADDRESS                 	(PHY_BASE_ADDRESS + 0x00101000)
 
 // BCM peripheral base registers
-#define GPIO_REG(offset)                	((unsigned int *)\
+#define GPIO_REG(offset)                	((volatile unsigned int *)\
                                                 (gpio_registers + ((offset) / (sizeof(unsigned int)))))
-#define PWM_REG(offset)                 	((unsigned int *)\
+#define PWM_REG(offset)                 	((volatile unsigned int *)\
                                                 (pwm_registers + ((offset) / (sizeof(unsigned int)))))
-#define CM_REG(offset)                  	((unsigned int *)\
+#define CM_REG(offset)                  	((volatile unsigned int *)\
                                                 (cm_registers + ((offset) / (sizeof(unsigned int)))))
 
 // GPIO ====================================================================================
@@ -178,9 +178,9 @@
 static struct proc_dir_entry *ws2812_proc = NULL;
 
 // define the registers for the GPIO peripheral
-static unsigned int *gpio_registers = NULL;
-static unsigned int *pwm_registers = NULL;
-static unsigned int *cm_registers = NULL;
+static volatile unsigned int *gpio_registers = NULL;
+static volatile unsigned int *pwm_registers = NULL;
+static volatile unsigned int *cm_registers = NULL;
 
 /**************************************************************************************
  * FUNCTION PROTOTYPES

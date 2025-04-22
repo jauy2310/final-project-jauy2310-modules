@@ -26,7 +26,7 @@ static const struct proc_ops fops = {
  */
 static int gpio_configure(unsigned int pin, gpfsel_mode_t mode) {
     // function setup
-    unsigned int *gpio_gpfseli;
+    volatile unsigned int *gpio_gpfseli;
 
     // check that pins are within bounds
     if (pin > NUM_GPIO_PINS) {
@@ -36,7 +36,7 @@ static int gpio_configure(unsigned int pin, gpfsel_mode_t mode) {
 
     // create a pointer to the selected pin's GPIO register
     // gpfsel registers each correspond to 10 pins each, using an offset at (pin / 10)
-    gpio_gpfseli = gpio_registers + (pin / 10);
+    gpio_gpfseli = (volatile unsigned int *)(gpio_registers + (pin / 10));
 
     // clear the target register bits and set the mode
     *gpio_gpfseli &= ~(GPIO_GPFSEL_MASK(pin));
@@ -53,7 +53,7 @@ static int gpio_configure(unsigned int pin, gpfsel_mode_t mode) {
  */
 static int gpio_set(unsigned int pin) {
     // function setup
-    unsigned int *gpio_gpsetn;
+    volatile unsigned int *gpio_gpsetn;
 
     // check that pins are within bounds
     if (pin > NUM_GPIO_PINS) {
@@ -82,7 +82,7 @@ static int gpio_set(unsigned int pin) {
  */
 static int gpio_clear(unsigned int pin) {
     // function setup
-    unsigned int *gpio_gpclrn;
+    volatile unsigned int *gpio_gpclrn;
 
     // check that pins are within bounds
     if (pin > NUM_GPIO_PINS) {
@@ -149,7 +149,7 @@ static int ws2812_init(void) {
      * INITIALIZE
      *****************************/
     // remap the GPIO peripheral's physical address to a driver-usable one
-    gpio_registers = (int *)ioremap(GPIO_BASE_ADDRESS, PAGE_SIZE);
+    gpio_registers = (volatile unsigned int *)ioremap(GPIO_BASE_ADDRESS, PAGE_SIZE);
     if (gpio_registers == NULL) {
         LOGE("> GPIO peripheral cannot be remapped.");
         return -ENOMEM;
@@ -158,7 +158,7 @@ static int ws2812_init(void) {
     }
 
     // remap the PWM peripheral's physical address to a driver-usable one
-    pwm_registers = (int *)ioremap(PWM_BASE_ADDRESS, PAGE_SIZE);
+    pwm_registers = (volatile unsigned int *)ioremap(PWM_BASE_ADDRESS, PAGE_SIZE);
     if (pwm_registers == NULL) {
         LOGE("> PWM peripheral cannot be remapped.");
         iounmap(gpio_registers);
@@ -168,7 +168,7 @@ static int ws2812_init(void) {
     }
 
     // remap the CM peripheral's physical address to a driver-usable one
-    cm_registers = (int *)ioremap(CM_BASE_ADDRESS, PAGE_SIZE);
+    cm_registers = (volatile unsigned int *)ioremap(CM_BASE_ADDRESS, PAGE_SIZE);
     if (cm_registers == NULL) {
         LOGE("> CM peripheral cannot be remapped.");
         iounmap(pwm_registers);
