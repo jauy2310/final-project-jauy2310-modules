@@ -199,6 +199,14 @@ static int ws2812_init(void) {
 
     // remap the CM peripheral's physical address to a driver-usable one
     cm_registers = (int *)ioremap(BCM_CM_BASE_ADDRESS, PAGE_SIZE);
+    if (cm_registers == NULL) {
+        LOGE("> CM peripheral cannot be remapped.");
+        iounmap(pwm_registers);
+        iounmap(gpio_registers);
+        return -ENOMEM;
+    } else {
+        LOG("> CM peripheral mapped in memory at 0x%p.", pwm_registers);
+    }
 
 
     /*****************************
@@ -263,6 +271,11 @@ static void ws2812_exit(void) {
     /*****************************
      * DE-INITIALIZE
      *****************************/
+    // unmap the CM peripheral from memory
+    if (cm_registers != NULL) {
+        LOG("> Unmapping CM peripheral.");
+        iounmap(cm_registers);
+    }
     // unmap the PWM peripheral from memory
     if (pwm_registers != NULL) {
         LOG("> Unmapping PWM peripheral.");
