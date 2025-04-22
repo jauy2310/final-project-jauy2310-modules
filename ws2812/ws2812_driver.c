@@ -83,12 +83,76 @@ static int gpio_clear(unsigned int pin) {
 
     // create a pointer to the selected pin's GPSET register
     if (pin < 32) {
-        *BCM_GPIO_REG(BCM_GPIO_GPCLR0) = BCM_GPIO_GPSETN_SET(1, pin);
+        *BCM_GPIO_REG(BCM_GPIO_GPCLR0) = BCM_GPIO_GPCLRN_SET(1, pin);
     } else {
-        *BCM_GPIO_REG(BCM_GPIO_GPCLR1) = BCM_GPIO_GPSETN_SET(1, pin);
+        *BCM_GPIO_REG(BCM_GPIO_GPCLR1) = BCM_GPIO_GPCLRN_SET(1, pin);
     }
 
     // return success
+    return 0;
+}
+
+/**
+ * cm_configure()
+ * 
+ * Configure the clock manager peripheral
+ */
+static int cm_configure(void) {
+    // function setup
+    unsigned int *cm_pwmctl = BCM_CM_REG(BCM_CM_PWMCTL);
+    unsigned int *cm_pwmdiv = BCM_CM_REG(BCM_CM_PWMDIV);
+
+    // disable clocks and wait until ready
+    REG_WRITE_FIELD(cm_pwmctl, BCM_CM_PASSWD_MASK, 0 | BCM_CM_PASSWD);
+    while(*cm_pwmctl & BCM_CM_PWMCTL_BUSY_MASK);
+    
+    // set divisor
+    REG_WRITE_FIELD(cm_pwmdiv, BCM_CM_PASSWD_MASK | BCM_CM_PWMDIV_MASK,
+                                BCM_CM_PASSWD | (WS2812_CLK_DIV << 12) | WS2812_CLK_DIV_FRAC);
+
+    // enable clock with PLLD (source = 6)
+    REG_WRITE_FIELD(cm_pwmctl, BCM_CM_PASSWD_MASK | BCM_CM_PWMCTL_SRC_MASK | BCM_CM_PWMCTL_ENAB_MASK,
+                                BCM_CM_PASSWD | 6 | 1 << 4);
+
+    // return
+    return 0;
+}
+
+/**
+ * pwm_configure()
+ * 
+ * Configure PWM peripheral using memory-mapped physical address
+ */
+static int pwm_configure(void) {
+    // function setup
+    unsigned int *pwm_ctl = BCM_PWM_REG(BCM_PWM_CTL);
+    unsigned int *pwm_dmac = BCM_PWM_REG(BCM_PWM_DMAC);
+    unsigned int *pwm_rng1 = BCM_PWM_REG(BCM_PWM_RNG1);
+    unsigned int *pwm_dat1 = BCM_PWM_REG(BCM_PWM_DAT1);
+    // unsigned int *pwm_fif1 = BCM_PWM_REG(BCM_PWM_FIF1);
+
+    // disable PWM for configuration
+    REG_WRITE_FIELD(pwm_ctl, BCM_PWM_CTL_PWEN1_MASK, 0);
+    
+    // configure CTL register
+    REG_WRITE_FIELD(pwm_ctl, BCM_PWM_CTL_MODE1_MASK, 0);        // PWM mode
+    REG_WRITE_FIELD(pwm_ctl, BCM_PWM_CTL_SBIT1_MASK, 1);        // Pull HIGH between transfers
+    REG_WRITE_FIELD(pwm_ctl, BCM_PWM_CTL_USEF1_MASK, 0);        // Disable FIFO (TODO: change after testing)
+    REG_WRITE_FIELD(pwm_ctl, BCM_PWM_CTL_MSEN1_MASK, 1);        // Enable Mark-Space mode
+
+    // configure DMAC register
+    REG_WRITE_FIELD(pwm_dmac, BCM_PWM_DMAC_ENAB_MASK, 0);       // Disable DMA (TODO: change after testing)
+
+    // configure RNG1 register
+    REG_WRITE_FIELD(pwm_rng1, BCM_PWM_RNG1_MASK, 0x0000000A);   // Set the RNG1 register to 0xA (=10)
+    
+    // configure DAT1 register
+    REG_WRITE_FIELD(pwm_dat1, BCM_PWM_DAT1_MASK, 0x00000007);   // Set the DAT1 register to 0x7 (=7)
+
+    // configuration complete; enable PWM
+    REG_WRITE_FIELD(pwm_ctl, BCM_PWM_CTL_PWEN1_MASK, 1);
+
+    // return
     return 0;
 }
 
@@ -120,8 +184,22 @@ static int ws2812_init(void) {
         LOGE("> GPIO peripheral cannot be remapped.");
         return -ENOMEM;
     } else {
-        LOG("> GPIO peripheral mapped in memory at %p.", gpio_registers);
+        LOG("> GPIO peripheral mapped in memory at 0x%p.", gpio_registers);
     }
+
+    // remap the PWM peripheral's physical address to a driver-usable one
+    pwm_registers = (int *)ioremap(BCM_PWM_BASE_ADDRESS, PAGE_SIZE);
+    if (pwm_registers == NULL) {
+        LOGE("> PWM peripheral cannot be remapped.");
+        iounmap(gpio_registers);
+        return -ENOMEM;
+    } else {
+        LOG("> PWM peripheral mapped in memory at 0x%p.", pwm_registers);
+    }
+
+    // remap the CM peripheral's physical address to a driver-usable one
+    cm_registers = (int *)ioremap(BCM_CM_BASE_ADDRESS, PAGE_SIZE);
+
 
     /*****************************
      * REGISTER MODULE
@@ -141,6 +219,8 @@ static int ws2812_init(void) {
      *****************************/
     // configure GPIO and turn on an LED
     gpio_configure(WS2812_GPIO_PIN, GPFSEL_OUTPUT);
+    cm_configure();
+    pwm_configure();
     gpio_set(WS2812_GPIO_PIN);
 
     /*****************************
@@ -183,6 +263,12 @@ static void ws2812_exit(void) {
     /*****************************
      * DE-INITIALIZE
      *****************************/
+    // unmap the PWM peripheral from memory
+    if (pwm_registers != NULL) {
+        LOG("> Unmapping PWM peripheral.");
+        iounmap(pwm_registers);
+    }
+
     // unmap the GPIO peripheral from memory
     if (gpio_registers != NULL) {
         LOG("> Unmapping GPIO peripheral.");
