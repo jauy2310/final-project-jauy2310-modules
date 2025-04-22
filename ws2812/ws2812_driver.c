@@ -38,8 +38,9 @@ static int gpio_configure(unsigned int pin, gpfsel_mode_t mode) {
     // gpfsel registers each correspond to 10 pins each, using an offset at (pin / 10)
     gpio_gpfseli = gpio_registers + (pin / 10);
 
-    // set the GPIO mode
-    REG_WRITE_FIELD(gpio_gpfseli, GPIO_GPFSEL_MASK(pin), mode);
+    // clear the target register bits and set the mode
+    *gpio_gpfseli &= ~(GPIO_GPFSEL_MASK(pin));
+    *gpio_gpfseli |= (GPIO_GPFSEL(pin, mode));
 
     // return success
     return 0;
@@ -67,8 +68,8 @@ static int gpio_set(unsigned int pin) {
         gpio_gpsetn = GPIO_REG(GPIO_GPSET1_OFFSET);
     }
 
-    // write to the register
-    REG_WRITE_FIELD(gpio_gpsetn, GPIO_GPSETN_MASK(pin), 1);
+    // write a 1 to the set bit corresponding to the pin
+    *gpio_gpsetn |= GPIO_GPSETN(pin);
 
     // return success
     return 0;
@@ -96,8 +97,8 @@ static int gpio_clear(unsigned int pin) {
         gpio_gpclrn = GPIO_REG(GPIO_GPCLR1_OFFSET);
     }
 
-    // write to the register
-    REG_WRITE_FIELD(gpio_gpclrn, GPIO_GPCLRN_MASK(pin), 1);
+    // write a 1 to the clear bit corresponding to the pin
+    *gpio_gpclrn |= GPIO_GPCLRN(pin);
 
     // return success
     return 0;

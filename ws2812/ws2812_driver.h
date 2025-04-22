@@ -69,12 +69,12 @@
 // BCM GPIO GPSET
 #define GPIO_GPSETN_SHIFT(pin)				(pin)
 #define GPIO_GPSETN_MASK(pin)				((0x1) << (GPIO_GPSETN_SHIFT(pin)))
-#define GPIO_GPSETN(pin, mode)				((0x1) << (pin))
+#define GPIO_GPSETN(pin)				    ((0x1) << (pin))
 
 // BCM GPIO GPCLR
 #define GPIO_GPCLRN_SHIFT(pin)				(pin)
 #define GPIO_GPCLRN_MASK(pin)				((0x1) << (GPIO_GPCLRN_SHIFT(pin)))
-#define GPIO_GPCLRN(pin, mode)				((0x1) << (pin))
+#define GPIO_GPCLRN(pin)				    ((0x1) << (pin))
 
 // PWM =====================================================================================
 // BCM PWM offsets
@@ -151,12 +151,6 @@
 
 // BCM CM PWMDIV
 #define CM_PWMDIV_MASK                  	((0x00FFFFFF) << (0))
-
-// MISC ===================================================================================
-
-// write a register field
-#define REG_WRITE_FIELD(addr, mask, val)    (*(addr) = (*(addr) & ~(mask)) | ((val) & (mask)))
-
 
 /**************************************************************************************
  * TYPEDEFS
