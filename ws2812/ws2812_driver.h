@@ -71,7 +71,8 @@
 // BCM peripheral base registers
 #define GPIO_REG(offset)                	((volatile unsigned int *)\
 												(gpio_registers + ((offset) / (sizeof(unsigned int)))))
-#define PWM_REG(offset)                 	((volatile unsigned int *)(pwm_registers + (offset)))
+#define PWM_REG(offset)                 	((volatile unsigned int *)\
+												(pwm_registers + ((offset) / (sizeof(unsigned int)))))
 #define CM_REG(offset)                  	((volatile unsigned int *)(cm_registers + (offset)))
 
 // GPIO ====================================================================================
