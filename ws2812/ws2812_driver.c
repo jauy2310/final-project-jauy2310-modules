@@ -129,11 +129,13 @@ static int cm_configure(pwmctl_src_t src, pwmctl_mash_t mash) {
     // configure the clock divider
     LOG("+ Configuring the clock divider.");
     *cm_pwmdiv = (CM_PASSWD) | (*cm_pwmdiv & ~CM_PWMDIV_MASK) | (CM_PWMDIV(PWMDIV_REGISTER));
+    LOG("+ CM_PWMDIV: 0x%08X", *cm_pwmdiv);
 
     // configure the clock source and MASH
     LOG("+ Configuring PWMCTL register.");
     *cm_pwmctl = (CM_PASSWD) | (*cm_pwmctl & ~CM_PWMCTL_SRC_MASK) | (CM_PWMCTL_SRC(src));
     *cm_pwmctl = (CM_PASSWD) | (*cm_pwmctl & ~CM_PWMCTL_MASH_MASK) | (CM_PWMCTL_MASH(mash));
+    LOG("+ CM_PWMCTL: 0x%08X", *cm_pwmctl);
 
     // enable clocks and wait until the busy flag turns on
     LOG("+ CM Configuration Complete! Enabling peripheral.");
