@@ -39,10 +39,13 @@ static int gpio_configure(unsigned int pin, gpfsel_mode_t mode) {
     gpio_gpfseli = (volatile unsigned int *)(gpio_registers + (pin / 10));
 
     // clear the target register bits and set the mode
+    LOG("+ Configuring GPFSEL%d register.", pin / 10);
     *gpio_gpfseli &= ~(GPIO_GPFSEL_MASK(pin));
     *gpio_gpfseli |= (GPIO_GPFSEL(pin, mode));
+    LOG("+ GPIO_GPFSEL%d [%p]: 0x%08X", pin / 10, gpio_gpfseli, *gpio_gpfseli);
 
     // return success
+    LOG("GPIO Configuration Complete! Enabling peripheral.");
     return 0;
 }
 
@@ -111,6 +114,7 @@ static int gpio_clear(unsigned int pin) {
  */
 static int cm_configure(pwmctl_src_t src, pwmctl_mash_t mash) {         
     // function setup
+    int timeout;
     volatile unsigned int *cm_pwmctl = CM_REG(CM_PWMCTL_OFFSET);
     volatile unsigned int *cm_pwmdiv = CM_REG(CM_PWMDIV_OFFSET);
 
@@ -120,7 +124,7 @@ static int cm_configure(pwmctl_src_t src, pwmctl_mash_t mash) {
 
     // waiting on busy flag
     LOG("+ Waiting for BUSY flag to go low...");
-    int timeout = 100000;
+    timeout = 100000;
     while((*cm_pwmctl & CM_PWMCTL_BUSY_MASK) && --timeout);
     if (timeout == 0) {
         LOGE("- BUSY flag never goes low.");
@@ -129,6 +133,7 @@ static int cm_configure(pwmctl_src_t src, pwmctl_mash_t mash) {
     // configure the clock divider
     LOG("+ Configuring the clock divider.");
     *cm_pwmdiv = (CM_PASSWD) | (*cm_pwmdiv & ~CM_PWMDIV_MASK) | (CM_PWMDIV(PWMDIV_REGISTER));
+    LOG("+ CM_PWMDIV [%p]: 0x%08X", cm_pwmdiv, *cm_pwmdiv);
 
     // configure the clock source and MASH
     LOG("+ Configuring PWMCTL register.");
@@ -136,6 +141,7 @@ static int cm_configure(pwmctl_src_t src, pwmctl_mash_t mash) {
     *cm_pwmctl |= (CM_PASSWD) | (CM_PWMCTL_SRC(src));
     *cm_pwmctl = (CM_PASSWD) | (*cm_pwmctl & ~CM_PWMCTL_MASH_MASK);
     *cm_pwmctl |= (CM_PASSWD) | (CM_PWMCTL_MASH(mash));
+    LOG("+ CM_PWMCTL [%p]: 0x%08X", cm_pwmctl, *cm_pwmctl);
 
     // enable clocks and wait until the busy flag turns on
     LOG("+ CM Configuration Complete! Enabling peripheral.");
