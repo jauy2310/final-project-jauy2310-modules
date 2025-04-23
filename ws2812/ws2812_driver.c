@@ -133,8 +133,10 @@ static int cm_configure(pwmctl_src_t src, pwmctl_mash_t mash) {
 
     // configure the clock source and MASH
     LOG("+ Configuring PWMCTL register.");
-    *cm_pwmctl = (CM_PASSWD) | (*cm_pwmctl & ~CM_PWMCTL_SRC_MASK) | (CM_PWMCTL_SRC(src));
-    *cm_pwmctl = (CM_PASSWD) | (*cm_pwmctl & ~CM_PWMCTL_MASH_MASK) | (CM_PWMCTL_MASH(mash));
+    *cm_pwmctl = (CM_PASSWD) | (*cm_pwmctl & ~CM_PWMCTL_SRC_MASK);
+    *cm_pwmctl |= (CM_PASSWD) | (CM_PWMCTL_SRC(src));
+    *cm_pwmctl = (CM_PASSWD) | (*cm_pwmctl & ~CM_PWMCTL_MASH_MASK);
+    *cm_pwmctl |= (CM_PASSWD) | (CM_PWMCTL_MASH(mash));
     LOG("+ CM_PWMCTL: 0x%08X", *cm_pwmctl);
 
     // enable clocks and wait until the busy flag turns on
