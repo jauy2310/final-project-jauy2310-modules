@@ -120,7 +120,11 @@ static int cm_configure(pwmctl_src_t src, pwmctl_mash_t mash) {
 
     // waiting on busy flag
     LOG("+ Waiting for BUSY flag to go low...");
-    while(*cm_pwmctl & CM_PWMCTL_BUSY_MASK);
+    int timeout = 100000;
+    while((*cm_pwmctl & CM_PWMCTL_BUSY_MASK) && --timeout);
+    if (timeout == 0) {
+        LOGE("- BUSY flag never goes low.");
+    }
 
     // configure the clock divider
     LOG("+ Configuring the clock divider.");
@@ -134,7 +138,12 @@ static int cm_configure(pwmctl_src_t src, pwmctl_mash_t mash) {
     // enable clocks and wait until the busy flag turns on
     LOG("+ CM Configuration Complete! Enabling peripheral.");
     *cm_pwmctl = (CM_PASSWD) | (*cm_pwmctl & ~CM_PWMCTL_ENAB_MASK) | (CM_PWMCTL_ENAB(1));
-    while(!(*cm_pwmctl & CM_PWMCTL_BUSY_MASK));
+
+    timeout = 100000;
+    while((!(*cm_pwmctl & CM_PWMCTL_BUSY_MASK)) && --timeout);
+    if (timeout == 0) {
+        LOGE("- BUSY flag never goes high.");
+    }
 
     // return
     return 0;
