@@ -109,7 +109,25 @@ static int gpio_clear(unsigned int pin) {
  * 
  * Configure the clock manager peripheral
  */
-static int cm_configure(void) {         
+static int cm_configure(pwmctl_src_t src, pwmctl_mash_t mash) {         
+    // function setup
+    volatile unsigned int *cm_pwmctl = CM_REG(CM_PWMCTL_OFFSET);
+    volatile unsigned int *cm_pwmdiv = CM_REG(CM_PWMDIV_OFFSET);
+
+    // disable clocks and wait until the busy flag is cleared
+    *cm_pwmctl = (CM_PASSWD) | (*cm_pwmctl & ~CM_PWMCTL_ENAB_MASK) | (CM_PWMCTL_ENAB(0));
+    while(*cm_pwmctl & CM_PWMCTL_BUSY_MASK);
+
+    // configure the clock divider
+    *cm_pwmdiv = (CM_PASSWD) | (*cm_pwmdiv & ~CM_PWMDIV_MASK) | (CM_PWMDIV(PWMDIV_REGISTER));
+
+    // configure the clock source and MASH
+    *cm_pwmctl = (CM_PASSWD) | (*cm_pwmctl & ~CM_PWMCTL_SRC_MASK) | (CM_PWMCTL_SRC(src));
+    *cm_pwmctl = (CM_PASSWD) | (*cm_pwmctl & ~CM_PWMCTL_MASH_MASK) | (CM_PWMCTL_MASH(mash));
+
+    // enable clocks and wait until the busy flag turns on
+    *cm_pwmctl = (CM_PASSWD) | (*cm_pwmctl & ~CM_PWMCTL_ENAB_MASK) | (CM_PWMCTL_ENAB(1));
+    while(!(*cm_pwmctl & CM_PWMCTL_BUSY_MASK));
 
     // return
     return 0;
@@ -121,6 +139,35 @@ static int cm_configure(void) {
  * Configure PWM peripheral using memory-mapped physical address
  */
 static int pwm_configure(void) {
+    // function setup
+    volatile unsigned int *pwm_ctl = PWM_REG(PWM_CTL_OFFSET);
+    volatile unsigned int *pwm_dmac = PWM_REG(PWM_DMAC_OFFSET);
+    volatile unsigned int *pwm_rng1 = PWM_REG(PWM_RNG1_OFFSET);
+    volatile unsigned int *pwm_dat1 = PWM_REG(PWM_DAT1_OFFSET);
+
+    // disable PWM for configuration
+    *pwm_ctl &= ~(PWM_CTL_PWEN1_MASK);
+
+    // configure the CTL register
+    *pwm_ctl &= ~(PWM_CTL_MODE1_MASK);          // set to PWM mode
+    *pwm_ctl &= ~(PWM_CTL_SBIT1_MASK);          // pull LOW between transfers (TODO: change after testing)
+    *pwm_ctl &= ~(PWM_CTL_USEF1_MASK);          // disable FIFO (TODO: change after testing)
+    *pwm_ctl &= ~(PWM_CTL_MSEN1_MASK);
+    *pwm_ctl |= PWM_CTL_MSEN1(1);               // enable Mark-Space (M/S) mode
+
+    // configure the DMAC register
+    *pwm_dmac &= ~(PWM_DMAC_ENAB_MASK);         // disable DMA (TODO: change after testing)
+    
+    // configure the RNG1 register
+    *pwm_rng1 &= ~(PWM_RNG1_MASK);
+    *pwm_rng1 |= PWM_RNG1(100);                 // set the range to 100 (percentage-based duty cycle)
+
+    // configure the DAT1 register
+    *pwm_dat1 &= ~(PWM_DAT1_MASK);
+    *pwm_dat1 |= PWM_DAT1(25);                  // set the duty cycle
+
+    // configuration complete; enable PWM
+    *pwm_ctl |= PWM_CTL_PWEN1(1);
 
     // return
     return 0;
@@ -197,7 +244,8 @@ static int ws2812_init(void) {
      *****************************/
     // configure GPIO and turn on an LED
     gpio_configure(WS2812_GPIO_PIN, GPFSEL_OUTPUT);
-    gpio_set(WS2812_GPIO_PIN);
+    cm_configure(PWMCTL_PLLD, PWMCTL_MASH1STAGE);
+    pwm_configure();
 
     /*****************************
      * RETURN

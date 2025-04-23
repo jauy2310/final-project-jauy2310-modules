@@ -35,8 +35,32 @@
 // define module information
 #define WS2812_MODULE_NAME                  "ws2812"
 #define WS2812_GPIO_PIN                     18
-#define WS2812_CLK_DIV                      62
-#define WS2812_CLK_DIV_FRAC                 2048
+
+/**
+ * CLOCK/PWM CONFIGURATION
+ * 
+ * 1. to keep it simple, we should assume 100 "ticks" per data bit sent to the WS2812,
+ * so we can configure duty cycle as a percentage
+ * 
+ * 2. the WS2812 needs 1.25us per bit, so (1.25 us/bit) / (100 ticks/bit) = 12.5ns/tick
+ * 
+ * 3. this equates to 1/(12.5ns/tick) = 80 megaticks/s = 80 MHz for the clock frequency
+ * 
+ * 4. divide the source clock by the desired clock to get the divider, so 500/80 = 6.25
+ * 
+ * 5. Since the PWM uses the clock divider register as a 12.12 fixed-point number, we
+ *    can do some bit math to figure this out
+ * 
+ *      Integer component = (6 << 12) & 0x00FFF000;
+ *      Fractional component = ((float)25/(float)100) * (1 << 12)
+ * 
+ * 6. OR'ing these together gives the register's set value
+ */
+#define PLLD_CLK_FREQ_HZ                    500000000
+#define WS2812_PWM_FREQ_HZ                  80000000
+#define PWM_CFG_INTEGERCOMP                 ((PLLD_CLK_FREQ_HZ / WS2812_PWM_FREQ_HZ) << (12))
+#define PWM_CFG_FRACTIONCOMP                (unsigned int)(((float)(PLLD_CLK_FREQ_HZ))/(float)(WS2812_PWM_FREQ_HZ) * (1 << 12))
+#define PWMDIV_REGISTER                     ((PWM_CFG_INTEGERCOMP) | (PWM_CFG_FRACTIONCOMP))
 
 // BCM base address in physical memory
 #define PHY_BASE_ADDRESS                	0x3F000000
@@ -46,11 +70,9 @@
 
 // BCM peripheral base registers
 #define GPIO_REG(offset)                	((volatile unsigned int *)\
-                                                (gpio_registers + ((offset) / (sizeof(unsigned int)))))
-#define PWM_REG(offset)                 	((volatile unsigned int *)\
-                                                (pwm_registers + ((offset) / (sizeof(unsigned int)))))
-#define CM_REG(offset)                  	((volatile unsigned int *)\
-                                                (cm_registers + ((offset) / (sizeof(unsigned int)))))
+												(gpio_registers + ((offset) / (sizeof(unsigned int)))))
+#define PWM_REG(offset)                 	((volatile unsigned int *)(pwm_registers + (offset)))
+#define CM_REG(offset)                  	((volatile unsigned int *)(cm_registers + (offset)))
 
 // GPIO ====================================================================================
 // BCM GPIO offsets
@@ -131,11 +153,11 @@
 #define CM_PASSWD_MASK                  	(0xFF000000)
 
 // BCM CM offsets
-#define CM_PWMCTL                       	(0x000000A0)
-#define CM_PWMDIV                       	(0x000000A4)
+#define CM_PWMCTL_OFFSET                    (0x000000A0)
+#define CM_PWMDIV_OFFSET                   	(0x000000A4)
 
 // BCM CM PWMCTL_SRC
-#define CM_PWMCTL_SRC_SHIFT					(0)
+#define CM_PWMCTL_SRC_SHIFT                 (0)
 #define CM_PWMCTL_SRC_MASK              	((0xF) << (CM_PWMCTL_SRC_SHIFT))
 #define CM_PWMCTL_SRC(val)					((CM_PWMCTL_SRC_MASK) & ((val) << (CM_PWMCTL_SRC_SHIFT)))
 
@@ -149,8 +171,15 @@
 #define CM_PWMCTL_BUSY_MASK             	((0x1) << (CM_PWMCTL_BUSY_SHIFT))
 #define CM_PWMCTL_BUSY(val)					((CM_PWMCTL_BUSY_MASK) & ((val) << (CM_PWMCTL_BUSY_SHIFT)))
 
+// BCM CM PWMCTL_MASH
+#define CM_PWMCTL_MASH_SHIFT                (9)
+#define CM_PWMCTL_MASH_MASK                 ((0x3) << (CM_PWMCTL_MASH_SHIFT))
+#define CM_PWMCTL_MASH(val)                 ((CM_PWMCTL_MASH_MASK) & ((val) << (CM_PWMCTL_MASH_SHIFT)))
+
 // BCM CM PWMDIV
-#define CM_PWMDIV_MASK                  	((0x00FFFFFF) << (0))
+#define CM_PWMDIV_SHIFT                     (0)
+#define CM_PWMDIV_MASK                  	((0x00FFFFFF) << (CM_PWMDIV_SHIFT))
+#define CM_PWMDIV(val)                      ((CM_PWMDIV_MASK) & ((val) << (CM_PWMDIV_SHIFT)))
 
 /**************************************************************************************
  * TYPEDEFS
@@ -161,15 +190,43 @@
  * Enumeration to control the GPFSEL registers
  */
  typedef enum {
-    GPFSEL_INPUT    = 000,
-    GPFSEL_OUTPUT   = 001,
-    GPFSEL_ALT0     = 100,
-    GPFSEL_ALT1     = 101,
-    GPFSEL_ALT2     = 110,
-    GPFSEL_ALT3     = 111,
-    GPFSEL_ALT4     = 011,
-    GPFSEL_ALT5     = 010,
+	GPFSEL_INPUT        = 0b000,
+	GPFSEL_OUTPUT       = 0b001,
+	GPFSEL_ALT0         = 0b100,
+	GPFSEL_ALT1         = 0b101,
+	GPFSEL_ALT2         = 0b110,
+	GPFSEL_ALT3         = 0b111,
+	GPFSEL_ALT4         = 0b011,
+	GPFSEL_ALT5         = 0b010,
 } gpfsel_mode_t;
+
+/**
+ * pwmctl_src_t
+ * 
+ * Enumeration to control the clock source of the CM (clock manager)
+ */
+typedef enum {
+	PWMCTL_GND          = 0b000,
+	PWMCTL_OSC          = 0b001,
+	PWMCTL_TESTDEBUG0   = 0B010,
+	PWMCTL_TESTDEBUG1   = 0b011,
+	PWMCTL_PLLA         = 0b100,
+	PWMCTL_PLLC         = 0b101,
+	PWMCTL_PLLD         = 0b110,
+	PWMCTL_HDMIAUX      = 0b111,
+} pwmctl_src_t;
+
+/**
+ * pwmctl_mash_t
+ * 
+ * Enumeration to determine the MASH algorithm
+ */
+typedef enum {
+	PWMCTL_MASHINT      = 0b000,
+	PWMCTL_MASH1STAGE   = 0b001,
+	PWMCTL_MASH2STAGE   = 0b010,
+	PWMCTL_MASH3STAGE   = 0b011,
+} pwmctl_mash_t;
 
 /**************************************************************************************
  * GLOBALS
