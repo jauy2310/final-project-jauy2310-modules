@@ -174,24 +174,24 @@ static int pwm_configure(void) {
     *pwm_ctl &= ~(PWM_CTL_USEF1_MASK);          // disable FIFO (TODO: change after testing)
     *pwm_ctl &= ~(PWM_CTL_MSEN1_MASK);
     *pwm_ctl |= PWM_CTL_MSEN1(1);               // enable Mark-Space (M/S) mode
-    LOG("+ PWM_CTL: 0x%08X", *pwm_ctl);
+    LOG("+ PWM_CTL [%p]: 0x%08X", pwm_ctl, *pwm_ctl);
 
     // configure the DMAC register
     LOG("+ Configuring DMAC register.");
     *pwm_dmac &= ~(PWM_DMAC_ENAB_MASK);         // disable DMA (TODO: change after testing)
-    LOG("+ PWM_DMAC: 0x%08X", *pwm_dmac);
+    LOG("+ PWM_DMAC [%p]: 0x%08X", pwm_dmac, *pwm_dmac);
     
     // configure the RNG1 register
     LOG("+ Configuring RNG1 register.");
     *pwm_rng1 &= ~(PWM_RNG1_MASK);
     *pwm_rng1 |= PWM_RNG1(100);                 // set the range to 100 (percentage-based duty cycle)
-    LOG("+ PWM_RNG1: 0x%08X", *pwm_rng1);
+    LOG("+ PWM_RNG1 [%p]: 0x%08X", pwm_rng1, *pwm_rng1);
 
     // configure the DAT1 register
     LOG("+ Configuring DAT1 register.");
     *pwm_dat1 &= ~(PWM_DAT1_MASK);
     *pwm_dat1 |= PWM_DAT1(25);                  // set the duty cycle
-    LOG("+ PWM_DAT1: 0x%08X", *pwm_dat1);
+    LOG("+ PWM_DAT1 [%p]: 0x%08X", pwm_dat1, *pwm_dat1);
 
     // configuration complete; enable PWM
     LOG("+ PWM Configuration Complete! Enabling peripheral.");
