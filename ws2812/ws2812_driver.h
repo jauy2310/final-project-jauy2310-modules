@@ -54,13 +54,9 @@
  *      Integer component = (6 << 12) & 0x00FFF000;
  *      Fractional component = ((float)25/(float)100) * (1 << 12)
  * 
- * 6. OR'ing these together gives the register's set value
+ * 6. OR'ing these together gives the register's set value (0x00006400)
  */
-#define PLLD_CLK_FREQ_HZ                    500000000
-#define WS2812_PWM_FREQ_HZ                  80000000
-#define PWM_CFG_INTEGERCOMP                 ((PLLD_CLK_FREQ_HZ / WS2812_PWM_FREQ_HZ) << (12))
-#define PWM_CFG_FRACTIONCOMP                (unsigned int)(((float)(PLLD_CLK_FREQ_HZ))/(float)(WS2812_PWM_FREQ_HZ) * (1 << 12))
-#define PWMDIV_REGISTER                     ((PWM_CFG_INTEGERCOMP) | (PWM_CFG_FRACTIONCOMP))
+#define PWMDIV_REGISTER                     (0x00006400)
 
 // BCM base address in physical memory
 #define PHY_BASE_ADDRESS                	0x3F000000
