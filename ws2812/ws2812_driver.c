@@ -272,7 +272,7 @@ static int ws2812_init(void) {
      *****************************/
     // configure GPIO and turn on an LED
     LOG("> Configuring GPIO.");
-    gpio_configure(WS2812_GPIO_PIN, GPFSEL_OUTPUT);
+    gpio_configure(WS2812_GPIO_PIN, GPFSEL_ALT5);
     // gpio_set(WS2812_GPIO_PIN);
     
     LOG("> Configuring CM.");

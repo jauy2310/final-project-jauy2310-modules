@@ -61,7 +61,7 @@
 // BCM base address in physical memory
 #define PHY_BASE_ADDRESS                	0x3F000000
 #define GPIO_BASE_ADDRESS               	(PHY_BASE_ADDRESS + 0x00200000)
-#define PWM_BASE_ADDRESS                	(PHY_BASE_ADDRESS + 0x0000C000)
+#define PWM_BASE_ADDRESS                	(PHY_BASE_ADDRESS + 0x0020C000)
 #define CM_BASE_ADDRESS                 	(PHY_BASE_ADDRESS + 0x00101000)
 
 // BCM peripheral base registers
