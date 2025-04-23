@@ -1,6 +1,9 @@
 #include "led.h"
 
 int add_led(int red, int green, int blue, struct led_node **head) {
+    // function setup
+    struct led_node *curr;
+
     // allocate memory for a new node
     struct led_node *new = kmalloc(sizeof(struct led_node), GFP_KERNEL);
 
@@ -11,13 +14,13 @@ int add_led(int red, int green, int blue, struct led_node **head) {
     new->next = NULL;
 
     // check if the list is empty
+    curr = *head;
     if (*head == NULL) {
         *head = new;
         return 1;
     }
 
     // list is not empty; traverse to end and add new node
-    struct led_node *curr = *head;
     while (curr->next != NULL) {
         curr = curr->next;
     }
@@ -28,6 +31,8 @@ int add_led(int red, int green, int blue, struct led_node **head) {
 }
 
 void remove_led(struct led_node **head) {
+    // function setup
+    struct led_node *curr = *head;
     // check if list is empty; return if it is
     if (*head == NULL) {
         return;
@@ -41,7 +46,6 @@ void remove_led(struct led_node **head) {
     }
 
     // iterate through the list to get to the second to last node
-    struct led_node *curr = *head;
     while (curr->next->next != NULL) {
         curr = curr->next;
     }
@@ -52,14 +56,17 @@ void remove_led(struct led_node **head) {
 }
 
 size_t size_led(struct led_node *head) {
+    // function setup
+    size_t nodes = 0;
+    struct led_node *curr;
+
     // check if list is empty
     if (head == NULL) {
         return 0;
     }
 
     // count nodes in list
-    size_t nodes = 0;
-    struct led_node *curr = head;
+    curr = head;
     while (curr != NULL) {
         nodes++;
         curr = curr->next;
@@ -80,6 +87,10 @@ unsigned int colorof_led(struct led_node *led) {
 }
 
 void print_led(struct led_node *head) {
+    // function setup
+    struct led_node *curr;
+    size_t index = 0;
+
     // print header
     LOG("===== [LEDS] =====");  
     
@@ -89,23 +100,25 @@ void print_led(struct led_node *head) {
     }
 
     // loop and print all LEDs
-    struct led_node *curr = head;
-    size_t index = 0;
+    curr = head;
     while (curr->next != NULL) {
-        LOG("[%lu] 0x%06X", index, colorof_led(curr));
+        LOG("[%zu] 0x%06X", index, colorof_led(curr));
         curr = curr->next;
         index++;
     }
 }
 
 void free_led(struct led_node *head) {
+    // function setup
+    struct led_node *curr;
+
     // check if NULL; return immediately if no nodes to free
     if (head == NULL) {
         return;
     }
 
     // iterate through, freeing each node
-    struct led_node *curr = head;
+    curr = head;
     while (curr != NULL) {
         struct led_node *next = curr->next;
         kfree(curr);
