@@ -271,12 +271,13 @@ static int ws2812_init(void) {
     // configure GPIO and turn on an LED
     LOG("> Configuring GPIO.");
     gpio_configure(WS2812_GPIO_PIN, GPFSEL_OUTPUT);
+    gpio_set(WS2812_GPIO_PIN);
     
-    LOG("> Configuring CM.");
-    cm_configure(PWMCTL_PLLD, PWMCTL_MASH1STAGE);
+    // LOG("> Configuring CM.");
+    // cm_configure(PWMCTL_PLLD, PWMCTL_MASH1STAGE);
 
-    LOG("> Configuring PWM.");
-    pwm_configure();
+    // LOG("> Configuring PWM.");
+    // pwm_configure();
 
     /*****************************
      * RETURN
