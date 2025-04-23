@@ -137,11 +137,11 @@ static int cm_configure(pwmctl_src_t src, pwmctl_mash_t mash) {
     *cm_pwmctl |= (CM_PASSWD) | (CM_PWMCTL_SRC(src));
     *cm_pwmctl = (CM_PASSWD) | (*cm_pwmctl & ~CM_PWMCTL_MASH_MASK);
     *cm_pwmctl |= (CM_PASSWD) | (CM_PWMCTL_MASH(mash));
-    LOG("+ CM_PWMCTL: 0x%08X", *cm_pwmctl);
 
     // enable clocks and wait until the busy flag turns on
     LOG("+ CM Configuration Complete! Enabling peripheral.");
     *cm_pwmctl |= (CM_PASSWD) | (CM_PWMCTL_ENAB(1));
+    LOG("+ CM_PWMCTL: 0x%08X", *cm_pwmctl);
 
     timeout = 100000;
     while((!(*cm_pwmctl & CM_PWMCTL_BUSY_MASK)) && --timeout);
