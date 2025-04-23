@@ -129,7 +129,6 @@ static int cm_configure(pwmctl_src_t src, pwmctl_mash_t mash) {
     // configure the clock divider
     LOG("+ Configuring the clock divider.");
     *cm_pwmdiv = (CM_PASSWD) | (*cm_pwmdiv & ~CM_PWMDIV_MASK) | (CM_PWMDIV(PWMDIV_REGISTER));
-    LOG("+ CM_PWMDIV: 0x%08X", *cm_pwmdiv);
 
     // configure the clock source and MASH
     LOG("+ Configuring PWMCTL register.");
@@ -141,7 +140,6 @@ static int cm_configure(pwmctl_src_t src, pwmctl_mash_t mash) {
     // enable clocks and wait until the busy flag turns on
     LOG("+ CM Configuration Complete! Enabling peripheral.");
     *cm_pwmctl |= (CM_PASSWD) | (CM_PWMCTL_ENAB(1));
-    LOG("+ CM_PWMCTL: 0x%08X", *cm_pwmctl);
 
     timeout = 100000;
     while((!(*cm_pwmctl & CM_PWMCTL_BUSY_MASK)) && --timeout);
@@ -176,20 +174,24 @@ static int pwm_configure(void) {
     *pwm_ctl &= ~(PWM_CTL_USEF1_MASK);          // disable FIFO (TODO: change after testing)
     *pwm_ctl &= ~(PWM_CTL_MSEN1_MASK);
     *pwm_ctl |= PWM_CTL_MSEN1(1);               // enable Mark-Space (M/S) mode
+    LOG("+ PWM_CTL: 0x%08X", *pwm_ctl);
 
     // configure the DMAC register
     LOG("+ Configuring DMAC register.");
     *pwm_dmac &= ~(PWM_DMAC_ENAB_MASK);         // disable DMA (TODO: change after testing)
+    LOG("+ PWM_DMAC: 0x%08X", *pwm_dmac);
     
     // configure the RNG1 register
     LOG("+ Configuring RNG1 register.");
     *pwm_rng1 &= ~(PWM_RNG1_MASK);
     *pwm_rng1 |= PWM_RNG1(100);                 // set the range to 100 (percentage-based duty cycle)
+    LOG("+ PWM_RNG1: 0x%08X", *pwm_rng1);
 
     // configure the DAT1 register
     LOG("+ Configuring DAT1 register.");
     *pwm_dat1 &= ~(PWM_DAT1_MASK);
     *pwm_dat1 |= PWM_DAT1(25);                  // set the duty cycle
+    LOG("+ PWM_DAT1: 0x%08X", *pwm_dat1);
 
     // configuration complete; enable PWM
     LOG("+ PWM Configuration Complete! Enabling peripheral.");
@@ -271,13 +273,13 @@ static int ws2812_init(void) {
     // configure GPIO and turn on an LED
     LOG("> Configuring GPIO.");
     gpio_configure(WS2812_GPIO_PIN, GPFSEL_OUTPUT);
-    gpio_set(WS2812_GPIO_PIN);
+    // gpio_set(WS2812_GPIO_PIN);
     
-    // LOG("> Configuring CM.");
-    // cm_configure(PWMCTL_PLLD, PWMCTL_MASH1STAGE);
+    LOG("> Configuring CM.");
+    cm_configure(PWMCTL_PLLD, PWMCTL_MASH1STAGE);
 
-    // LOG("> Configuring PWM.");
-    // pwm_configure();
+    LOG("> Configuring PWM.");
+    pwm_configure();
 
     /*****************************
      * RETURN
