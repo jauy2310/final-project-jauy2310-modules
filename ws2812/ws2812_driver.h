@@ -65,10 +65,9 @@
 #define CM_BASE_ADDRESS                 	(PHY_BASE_ADDRESS + 0x00101000)
 
 // BCM peripheral base registers
-#define GPIO_REG(offset)                	((volatile unsigned int *)\
-												(gpio_registers + ((offset) / (sizeof(unsigned int)))))
-#define PWM_REG(offset)                 	((volatile unsigned int *)(pwm_registers + (offset)))
-#define CM_REG(offset)                  	((volatile unsigned int *)(cm_registers + (offset)))
+#define GPIO_REG(offset)                	((volatile unsigned int *)(((char *)gpio_registers) + (offset)))
+#define PWM_REG(offset)                 	((volatile unsigned int *)(((char *)pwm_registers) + (offset)))
+#define CM_REG(offset)                  	((volatile unsigned int *)(((char *)cm_registers) + (offset)))
 
 // GPIO ====================================================================================
 // BCM GPIO offsets
