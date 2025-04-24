@@ -237,6 +237,7 @@ static int dma_configure(void) {
     ws2812_device.dma_cb->txfr_len = 200; // TODO: change this to the length of the LED buffer; adding/removing leds require this to update
     ws2812_device.dma_cb->stride = 0;
     ws2812_device.dma_cb->nextconbk = ws2812_device.cb_phys; // repeat the buffer
+    LOG("+ DMA control block allocated at %p (phys: %pa)", ws2812_device.dma_cb, &ws2812_device.cb_phys);
 
     // set the control block address
     LOG("+ Setting the configured control block to the DMA's settings.");
