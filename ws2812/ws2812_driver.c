@@ -177,14 +177,13 @@ static int pwm_configure(void) {
     LOG("+ Configuring CTL register.");
     *pwm_ctl &= ~(PWM_CTL_MODE1_MASK);          // set to PWM mode
     *pwm_ctl &= ~(PWM_CTL_SBIT1_MASK);          // pull LOW between transfers (TODO: change after testing)
-    *pwm_ctl &= ~(PWM_CTL_USEF1_MASK);          // disable FIFO (TODO: change after testing)
-    *pwm_ctl &= ~(PWM_CTL_MSEN1_MASK);
+    *pwm_ctl |= PWM_CTL_USEF1(1);               // enable FIFO
     *pwm_ctl |= PWM_CTL_MSEN1(1);               // enable Mark-Space (M/S) mode
     LOG("+ PWM_CTL [%p]: 0x%08X", pwm_ctl, *pwm_ctl);
 
     // configure the DMAC register
     LOG("+ Configuring DMAC register.");
-    *pwm_dmac &= ~(PWM_DMAC_ENAB_MASK);         // disable DMA (TODO: change after testing)
+    *pwm_dmac |= PWM_DMAC_ENAB(1);              // enable DMA
     LOG("+ PWM_DMAC [%p]: 0x%08X", pwm_dmac, *pwm_dmac);
     
     // configure the RNG1 register
@@ -205,6 +204,79 @@ static int pwm_configure(void) {
 
     // return
     return 0;
+}
+
+/**
+ * dma_configure()
+ * 
+ * Configure DMA peripheral using memory-mapped physical address
+ */
+static int dma_configure(void) {
+    // function setup
+    volatile unsigned int *dma_cs = DMA_REG(DMA_CS_OFFSET);
+    volatile unsigned int *dma_conblkad = DMA_REG(DMA_CONBLKAD_OFFSET);
+
+    // disable DMA channel
+    LOG("+ Disabling DMA for configuration.");
+    *dma_cs &= ~(DMA_CS_ACTIVE_MASK);
+    
+    // create a control block structure
+    LOG("+ Allocating DMA-accessible control block.");
+    dma_cb = dma_alloc_coherent(NULL, sizeof(dma_cb_t), &cb_phys, GFP_KERNEL);
+    if (dma_cb == NULL) {
+        LOGE("- Error allocating memory for DMA handle.");
+        return -ENOMEM;
+    }
+
+    // fill the control block
+    // DMA controller uses the bus addresses, not the virtually-mapped addresses, so dest_ad = bus address
+    LOG("+ Configuring DMA control block structure.");
+    dma_cb->ti = DMA_TI_SRCINC(1) | DMA_TI_DESTDREQ(1) | DMA_TI_PERMAP(DMA_PERMAP_PWM);
+    dma_cb->source_ad = dma_buffer_phys;
+    dma_cb->dest_ad = PWM_BUS_BASE_ADDRESS + PWM_FIF1_OFFSET;
+    dma_cb->txfr_len = 200; // TODO: change this to the length of the LED buffer; adding/removing leds require this to update
+    dma_cb->stride = 0;
+    dma_cb->nextconbk = cb_phys; // repeat the buffer
+
+    // set the control block address
+    LOG("+ Setting the configured control block to the DMA's settings.");
+    *dma_conblkad = cb_phys;
+
+    // enable DMA channel
+    LOG("+ DMA Configuration Complete! Enabling peripheral.");
+    *dma_cs |= DMA_CS_ACTIVE(1);
+
+    // return 
+    return 0;
+}
+
+/**
+ * dma_cleanup()
+ * 
+ * Deconfigures the DMA
+ */
+static void dma_cleanup(void) {
+    // function setup
+    volatile unsigned int *dma_cs = DMA_REG(DMA_CS_OFFSET);
+    volatile unsigned int *dma_conblkad = DMA_REG(DMA_CONBLKAD_OFFSET);
+
+    // disable DMA channel
+    LOG("+ Disabling DMA channel.");
+    *dma_cs &= ~(DMA_CS_ACTIVE_MASK);  // Clear the ACTIVE bit to stop the DMA transfer
+
+    // clear the control block address
+    LOG("+ Clearing DMA control block address.");
+    *dma_conblkad = 0;  // Clear the control block address
+
+    // Free any allocated DMA resources if necessary
+    if (dma_cb != NULL) {
+        dma_free_coherent(NULL, sizeof(dma_cb_t), dma_cb, cb_phys);  // Free the control block
+        dma_cb = NULL;
+        cb_phys = 0;
+    }
+
+    // Optional: Additional clean-up or resetting registers if necessary
+    LOG("DMA deconfiguration complete.");
 }
 
 /**************************************************************************************
@@ -259,6 +331,27 @@ static int ws2812_init(void) {
         LOG("> CM peripheral mapped in memory at 0x%p.", cm_registers);
     }
 
+    dma_registers = (volatile unsigned int *)ioremap(DMA_CHANNEL_BASE_ADDRESS, PAGE_SIZE);
+    if (dma_registers == NULL) {
+        LOGE("> DMA peripheral cannot be remapped.");
+        iounmap(cm_registers);
+        iounmap(pwm_registers);
+        iounmap(gpio_registers);
+        return -ENOMEM;
+    } else {
+        LOG("> DMA peripheral mapped in memory at 0x%p.", dma_registers);
+    }
+
+    // initialize dma buffer
+    dma_buffer = dma_alloc_coherent(NULL, 200, &dma_buffer_phys, GFP_KERNEL);
+    for (int i = 0; i < 200; i++) {
+        if (i < 100) {
+            dma_buffer[i] = i;
+        } else {
+            dma_buffer[i] = 200 - i;
+        }
+    }
+
 
     /*****************************
      * REGISTER MODULE
@@ -287,6 +380,9 @@ static int ws2812_init(void) {
     LOG("> Configuring PWM.");
     pwm_configure();
 
+    LOG("> Configuring DMA.");
+    dma_configure();
+
     /*****************************
      * RETURN
      *****************************/
@@ -309,6 +405,9 @@ static void ws2812_exit(void) {
     /*****************************
      * PRE-EXIT ACTIONS
      *****************************/
+    // deconfigure DMA
+    dma_cleanup();
+
     // turn off an LED and configure GPIO to default
     gpio_clear(WS2812_GPIO_PIN);
     gpio_configure(WS2812_GPIO_PIN, GPFSEL_INPUT);
@@ -327,6 +426,13 @@ static void ws2812_exit(void) {
     /*****************************
      * DE-INITIALIZE
      *****************************/
+    // free the DMA-accessible memory for the dma_buffer
+    if (dma_buffer != NULL) {
+        LOG("> Freeing DMA-accessible memory for the DMA buffer.");
+        dma_free_coherent(NULL, 200, dma_buffer, dma_buffer_phys);
+        dma_buffer = NULL;
+    }
+
     // unmap the CM peripheral from memory
     if (cm_registers != NULL) {
         LOG("> Unmapping CM peripheral.");

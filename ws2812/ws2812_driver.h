@@ -21,6 +21,7 @@
 #include <linux/slab.h>             // memory allocation
 #include <linux/proc_fs.h>          // expose the /proc filesystem
 #include <asm/io.h>                 // provides arch-specific memory mapping
+#include <linux/dma-mapping.h>      // provides memory mapping for DMA peripheral
 
 // local includes
 #include "log.h"
@@ -30,7 +31,7 @@
  * MACROS/DEFINES
  **************************************************************************************/
 // Broadcom (BCM) defines
-#define NUM_GPIO_PINS                   	53
+#define NUM_GPIO_PINS                       53
 
 // define module information
 #define WS2812_MODULE_NAME                  "ws2812"
@@ -59,39 +60,45 @@
 #define PWMDIV_REGISTER                     (0x00006400)
 
 // BCM base address in physical memory
-#define PHY_BASE_ADDRESS                	0x3F000000
-#define GPIO_BASE_ADDRESS               	(PHY_BASE_ADDRESS + 0x00200000)
-#define PWM_BASE_ADDRESS                	(PHY_BASE_ADDRESS + 0x0020C000)
-#define CM_BASE_ADDRESS                 	(PHY_BASE_ADDRESS + 0x00101000)
+#define PHY_BASE_ADDRESS                    (0x3F000000)
+#define GPIO_BASE_ADDRESS                   (PHY_BASE_ADDRESS + 0x00200000)
+#define PWM_BASE_ADDRESS                    (PHY_BASE_ADDRESS + 0x0020C000)
+#define CM_BASE_ADDRESS                     (PHY_BASE_ADDRESS + 0x00101000)
+#define DMA_BASE_ADDRESS                    (PHY_BASE_ADDRESS + 0x00007000)
+
+// BCM bus addresses
+#define BUS_BASE_ADDRESS                    (0x7E000000)
+#define PWM_BUS_BASE_ADDRESS                (BUS_BASE_ADDRESS + 0x0020C000)
 
 // BCM peripheral base registers
-#define GPIO_REG(offset)                	((volatile unsigned int *)(((char *)gpio_registers) + (offset)))
-#define PWM_REG(offset)                 	((volatile unsigned int *)(((char *)pwm_registers) + (offset)))
-#define CM_REG(offset)                  	((volatile unsigned int *)(((char *)cm_registers) + (offset)))
+#define GPIO_REG(offset)                    ((volatile unsigned int *)(((char *)gpio_registers) + (offset)))
+#define PWM_REG(offset)                     ((volatile unsigned int *)(((char *)pwm_registers) + (offset)))
+#define CM_REG(offset)                      ((volatile unsigned int *)(((char *)cm_registers) + (offset)))
+#define DMA_REG(offset)                     ((volatile unsigned int *)(((char *)dma_registers) + (offset)))
 
 // GPIO ====================================================================================
 // BCM GPIO offsets
-#define GPIO_GPFSEL0_OFFSET					(0x00000000)
-#define GPIO_GPSET0_OFFSET					(0x0000001C)
-#define GPIO_GPSET1_OFFSET					(0x00000020)
-#define GPIO_GPCLR0_OFFSET					(0x00000028)
-#define GPIO_GPCLR1_OFFSET					(0x0000002C)
+#define GPIO_GPFSEL0_OFFSET                 (0x00000000)
+#define GPIO_GPSET0_OFFSET                  (0x0000001C)
+#define GPIO_GPSET1_OFFSET                  (0x00000020)
+#define GPIO_GPCLR0_OFFSET                  (0x00000028)
+#define GPIO_GPCLR1_OFFSET                  (0x0000002C)
 
 // GPFSELn
-#define GPIO_GPFSEL_SHIFT(pin)				(((pin) % (10)) * (3))
-#define GPIO_GPFSEL_MASK(pin)				((0x7) << (GPIO_GPFSEL_SHIFT(pin)))
-#define GPIO_GPFSEL_VALUE(pin, mode)		(((mode) & (0x7)) << (GPIO_GPFSEL_SHIFT(pin)))
-#define GPIO_GPFSEL(pin, mode)				((GPIO_GPFSEL_MASK(pin)) & ((GPIO_GPFSEL_VALUE(pin, mode))))
+#define GPIO_GPFSEL_SHIFT(pin)              (((pin) % (10)) * (3))
+#define GPIO_GPFSEL_MASK(pin)               ((0x7) << (GPIO_GPFSEL_SHIFT(pin)))
+#define GPIO_GPFSEL_VALUE(pin, mode)        (((mode) & (0x7)) << (GPIO_GPFSEL_SHIFT(pin)))
+#define GPIO_GPFSEL(pin, mode)              ((GPIO_GPFSEL_MASK(pin)) & ((GPIO_GPFSEL_VALUE(pin, mode))))
 
 // BCM GPIO GPSET
-#define GPIO_GPSETN_SHIFT(pin)				(pin)
-#define GPIO_GPSETN_MASK(pin)				((0x1) << (GPIO_GPSETN_SHIFT(pin)))
-#define GPIO_GPSETN(pin)				    ((0x1) << (pin))
+#define GPIO_GPSETN_SHIFT(pin)              (pin)
+#define GPIO_GPSETN_MASK(pin)               ((0x1) << (GPIO_GPSETN_SHIFT(pin)))
+#define GPIO_GPSETN(pin)                    ((0x1) << (pin))
 
 // BCM GPIO GPCLR
-#define GPIO_GPCLRN_SHIFT(pin)				(pin)
-#define GPIO_GPCLRN_MASK(pin)				((0x1) << (GPIO_GPCLRN_SHIFT(pin)))
-#define GPIO_GPCLRN(pin)				    ((0x1) << (pin))
+#define GPIO_GPCLRN_SHIFT(pin)              (pin)
+#define GPIO_GPCLRN_MASK(pin)               ((0x1) << (GPIO_GPCLRN_SHIFT(pin)))
+#define GPIO_GPCLRN(pin)                    ((0x1) << (pin))
 
 // PWM =====================================================================================
 // BCM PWM offsets
@@ -102,50 +109,50 @@
 #define PWM_FIF1_OFFSET                     (0x00000018)
 
 // BCM PWM CTL
-#define PWM_CTL_PWEN1_SHIFT					(0)
-#define PWM_CTL_PWEN1_MASK					((0x1) << (PWM_CTL_PWEN1_SHIFT))
-#define PWM_CTL_PWEN1(val)					((PWM_CTL_PWEN1_MASK) & ((val) << (PWM_CTL_PWEN1_SHIFT)))
+#define PWM_CTL_PWEN1_SHIFT                 (0)
+#define PWM_CTL_PWEN1_MASK                  ((0x1) << (PWM_CTL_PWEN1_SHIFT))
+#define PWM_CTL_PWEN1(val)                  ((PWM_CTL_PWEN1_MASK) & ((val) << (PWM_CTL_PWEN1_SHIFT)))
 
-#define PWM_CTL_MODE1_SHIFT					(1)
-#define PWM_CTL_MODE1_MASK					((0x1) << (PWM_CTL_MODE1_SHIFT))
-#define PWM_CTL_MODE1(val)					((PWM_CTL_MODE1_MASK) & ((val) << (PWM_CTL_MODE1_SHIFT)))
+#define PWM_CTL_MODE1_SHIFT                 (1)
+#define PWM_CTL_MODE1_MASK                  ((0x1) << (PWM_CTL_MODE1_SHIFT))
+#define PWM_CTL_MODE1(val)                  ((PWM_CTL_MODE1_MASK) & ((val) << (PWM_CTL_MODE1_SHIFT)))
 
-#define PWM_CTL_SBIT1_SHIFT					(3)
-#define PWM_CTL_SBIT1_MASK					((0x1) << (PWM_CTL_SBIT1_SHIFT))
-#define PWM_CTL_SBIT1(val)					((PWM_CTL_SBIT1_MASK) & ((val) << (PWM_CTL_SBIT1_SHIFT)))
+#define PWM_CTL_SBIT1_SHIFT                 (3)
+#define PWM_CTL_SBIT1_MASK                  ((0x1) << (PWM_CTL_SBIT1_SHIFT))
+#define PWM_CTL_SBIT1(val)                  ((PWM_CTL_SBIT1_MASK) & ((val) << (PWM_CTL_SBIT1_SHIFT)))
 
-#define PWM_CTL_USEF1_SHIFT					(5)
-#define PWM_CTL_USEF1_MASK					((0x1) << (PWM_CTL_USEF1_SHIFT))
-#define PWM_CTL_USEF1(val)					((PWM_CTL_USEF1_MASK) & ((val) << (PWM_CTL_USEF1_SHIFT)))
+#define PWM_CTL_USEF1_SHIFT                 (5)
+#define PWM_CTL_USEF1_MASK                  ((0x1) << (PWM_CTL_USEF1_SHIFT))
+#define PWM_CTL_USEF1(val)                  ((PWM_CTL_USEF1_MASK) & ((val) << (PWM_CTL_USEF1_SHIFT)))
 
-#define PWM_CTL_MSEN1_SHIFT					(7)
-#define PWM_CTL_MSEN1_MASK					((0x1) << (PWM_CTL_MSEN1_SHIFT))
-#define PWM_CTL_MSEN1(val)					((PWM_CTL_MSEN1_MASK) & ((val) << (PWM_CTL_MSEN1_SHIFT)))
+#define PWM_CTL_MSEN1_SHIFT                 (7)
+#define PWM_CTL_MSEN1_MASK                  ((0x1) << (PWM_CTL_MSEN1_SHIFT))
+#define PWM_CTL_MSEN1(val)                  ((PWM_CTL_MSEN1_MASK) & ((val) << (PWM_CTL_MSEN1_SHIFT)))
 
 // BCM PWM DMAC
-#define PWM_DMAC_ENAB_SHIFT					(31)
-#define PWM_DMAC_ENAB_MASK              	((0x1) << (PWM_DMAC_ENAB_SHIFT))
-#define PWM_DMAC_ENAB(val)					((PWM_DMAC_ENAB_MASK) & ((val) << (PWM_DMAC_ENAB_SHIFT)))
+#define PWM_DMAC_ENAB_SHIFT                 (31)
+#define PWM_DMAC_ENAB_MASK                  ((0x1) << (PWM_DMAC_ENAB_SHIFT))
+#define PWM_DMAC_ENAB(val)                  ((PWM_DMAC_ENAB_MASK) & ((val) << (PWM_DMAC_ENAB_SHIFT)))
 
 // BCM PWM RNG1
-#define PWM_RNG1_SHIFT						(0)
-#define PWM_RNG1_MASK                   	((0xFFFFFFFF) << (PWM_RNG1_SHIFT))
-#define PWM_RNG1(val)						((PWM_RNG1_MASK) & ((val) << (PWM_RNG1_SHIFT)))
+#define PWM_RNG1_SHIFT                      (0)
+#define PWM_RNG1_MASK                       ((0xFFFFFFFF) << (PWM_RNG1_SHIFT))
+#define PWM_RNG1(val)                       ((PWM_RNG1_MASK) & ((val) << (PWM_RNG1_SHIFT)))
 
 // BCM PWM DAT1
-#define PWM_DAT1_SHIFT						(0)
-#define PWM_DAT1_MASK                   	((0xFFFFFFFF) << (PWM_DAT1_SHIFT))
-#define PWM_DAT1(val)						((PWM_DAT1_MASK) & ((val) << (PWM_DAT1_SHIFT)))
+#define PWM_DAT1_SHIFT                      (0)
+#define PWM_DAT1_MASK                       ((0xFFFFFFFF) << (PWM_DAT1_SHIFT))
+#define PWM_DAT1(val)                       ((PWM_DAT1_MASK) & ((val) << (PWM_DAT1_SHIFT)))
 
 // BCM PWM FIF1
-#define PWM_FIF1_PWM_FIFO_SHIFT				(0)
-#define PWM_FIF1_PWM_FIFO_MASK          	((0xFFFFFFF) << PWM_FIF1_PWM_FIFO_SHIFT)
-#define PWM_FIF1_PWM_FIFO(val)				((PWM_FIF1_PWM_FIFO_MASK) & ((val) << (PWM_FIF1_PWM_FIFO_SHIFT)))
+#define PWM_FIF1_PWM_FIFO_SHIFT             (0)
+#define PWM_FIF1_PWM_FIFO_MASK              ((0xFFFFFFF) << PWM_FIF1_PWM_FIFO_SHIFT)
+#define PWM_FIF1_PWM_FIFO(val)              ((PWM_FIF1_PWM_FIFO_MASK) & ((val) << (PWM_FIF1_PWM_FIFO_SHIFT)))
 
 // CM =====================================================================================
 // BCM CM constants
-#define CM_PASSWD                       	(0x5A000000)
-#define CM_PASSWD_MASK                  	(0xFF000000)
+#define CM_PASSWD                           (0x5A000000)
+#define CM_PASSWD_MASK                      (0xFF000000)
 
 // BCM CM offsets
 #define CM_PWMCTL_OFFSET                    (0x000000A0)
@@ -153,18 +160,18 @@
 
 // BCM CM PWMCTL_SRC
 #define CM_PWMCTL_SRC_SHIFT                 (0)
-#define CM_PWMCTL_SRC_MASK              	((0xF) << (CM_PWMCTL_SRC_SHIFT))
-#define CM_PWMCTL_SRC(val)					((CM_PWMCTL_SRC_MASK) & ((val) << (CM_PWMCTL_SRC_SHIFT)))
+#define CM_PWMCTL_SRC_MASK                  ((0xF) << (CM_PWMCTL_SRC_SHIFT))
+#define CM_PWMCTL_SRC(val)                  ((CM_PWMCTL_SRC_MASK) & ((val) << (CM_PWMCTL_SRC_SHIFT)))
 
 // BCM CM PWMCTL_ENAB
-#define CM_PWMCTL_ENAB_SHIFT				(4)
-#define CM_PWMCTL_ENAB_MASK             	((0x1) << (CM_PWMCTL_ENAB_SHIFT))
-#define CM_PWMCTL_ENAB(val)					((CM_PWMCTL_ENAB_MASK) & ((val) << (CM_PWMCTL_ENAB_SHIFT)))
+#define CM_PWMCTL_ENAB_SHIFT                (4)
+#define CM_PWMCTL_ENAB_MASK                 ((0x1) << (CM_PWMCTL_ENAB_SHIFT))
+#define CM_PWMCTL_ENAB(val)                 ((CM_PWMCTL_ENAB_MASK) & ((val) << (CM_PWMCTL_ENAB_SHIFT)))
 
 // BCM CM PWMCTL_BUSY
-#define CM_PWMCTL_BUSY_SHIFT				(7)
-#define CM_PWMCTL_BUSY_MASK             	((0x1) << (CM_PWMCTL_BUSY_SHIFT))
-#define CM_PWMCTL_BUSY(val)					((CM_PWMCTL_BUSY_MASK) & ((val) << (CM_PWMCTL_BUSY_SHIFT)))
+#define CM_PWMCTL_BUSY_SHIFT                (7)
+#define CM_PWMCTL_BUSY_MASK                 ((0x1) << (CM_PWMCTL_BUSY_SHIFT))
+#define CM_PWMCTL_BUSY(val)                 ((CM_PWMCTL_BUSY_MASK) & ((val) << (CM_PWMCTL_BUSY_SHIFT)))
 
 // BCM CM PWMCTL_MASH
 #define CM_PWMCTL_MASH_SHIFT                (9)
@@ -173,8 +180,54 @@
 
 // BCM CM PWMDIV
 #define CM_PWMDIV_SHIFT                     (0)
-#define CM_PWMDIV_MASK                  	((0x00FFFFFF) << (CM_PWMDIV_SHIFT))
+#define CM_PWMDIV_MASK                      ((0x00FFFFFF) << (CM_PWMDIV_SHIFT))
 #define CM_PWMDIV(val)                      ((CM_PWMDIV_MASK) & ((val) << (CM_PWMDIV_SHIFT)))
+
+// DMA =====================================================================================
+// BCM DMA constants
+#define DMA_CHANNEL                         5
+#define DMA_PERMAP_PWM                      5
+
+// BCM DMA5 offsets
+#define DMA_CHANNEL_OFFSET                  (0x100 * DMA_CHANNEL)
+#define DMA_CHANNEL_BASE_ADDRESS            (DMA_BASE_ADDRESS + DMA_CHANNEL_OFFSET)
+#define DMA_CS_OFFSET                       (DMA_CHANNEL_OFFSET + 0x00000000)
+#define DMA_CONBLKAD_OFFSET                 (DMA_CHANNEL_OFFSET + 0x00000004)
+
+// BCM DMA CS_ACTIVE
+#define DMA_CS_ACTIVE_SHIFT                 (0)
+#define DMA_CS_ACTIVE_MASK                  ((0x1) << (DMA_CS_ACTIVE_SHIFT))
+#define DMA_CS_ACTIVE(val)                  ((DMA_CS_ACTIVE_MASK) & ((val) << (DMA_CS_ACTIVE_SHIFT)))
+
+// BCM DMA CS_END
+#define DMA_CS_END_SHIFT                    (1)
+#define DMA_CS_END_MASK                     ((0x1) << (DMA_CS_END_SHIFT))
+#define DMA_CS_END(val)                     ((DMA_CS_END_MASK) & ((val) << (DMA_CS_END_SHIFT)))
+
+// BCM DMA CS_RESET
+#define DMA_CS_RESET_SHIFT                  (31)
+#define DMA_CS_RESET_MASK                   ((0x1) << (DMA_CS_RESET_SHIFT))
+#define DMA_CS_RESET(val)                   ((DMA_CS_RESET_MASK) & ((val) << (DMA_CS_RESET_SHIFT)))
+
+// BCM DMA CONBLKAD_SCB_ADDR
+#define DMA_CONBLKAD_SCB_SHIFT              (0)
+#define DMA_CONBLKAD_SCB_MASK               ((0xFFFFFFFF) << (DMA_CONBLKAD_SCB_SHIFT))
+#define DMA_CONBLKAD_SCB(val)               ((DMA_CONBLKAD_SCB_MASK) & ((val) << (DMA_CONBLKAD_SCB_SHIFT)))
+
+// BCM DMA TI_DESTDREQ
+#define DMA_TI_DESTDREQ_SHIFT               (6)
+#define DMA_TI_DESTDREQ_MASK                ((0x1) << (DMA_TI_DESTDREQ_SHIFT))
+#define DMA_TI_DESTDREQ(val)                ((DMA_TI_DESTDREQ_MASK) & ((val) << (DMA_TI_DESTDREQ_SHIFT)))
+
+// BCM DMA TI_SRCINC
+#define DMA_TI_SRCINC_SHIFT                 (8)
+#define DMA_TI_SRCINC_MASK                  ((0x1) << (DMA_TI_SRCINC_SHIFT))
+#define DMA_TI_SRCINC(val)                  ((DMA_TI_SRCINC_MASK) & ((val) << (DMA_TI_SRCINC_SHIFT)))
+
+// BCM DMA TI_PERMAP
+#define DMA_TI_PERMAP_SHIFT                 (16)
+#define DMA_TI_PERMAP_MASK                  ((0x1F) << (DMA_TI_PERMAP_SHIFT))
+#define DMA_TI_PERMAP(val)                  ((DMA_TI_PERMAP_MASK) & ((val) << (DMA_TI_PERMAP_SHIFT)))
 
 /**************************************************************************************
  * TYPEDEFS
@@ -223,6 +276,25 @@ typedef enum {
 	PWMCTL_MASH3STAGE   = 0b011,
 } pwmctl_mash_t;
 
+/**
+ * dma_cb_t
+ * 
+ * Define the structure of a DMA control block (CB) that will be stored in memory
+ * According to the datasheet, these are defined in memory - the address of this
+ * memory is automatically loaded into the proper registers at the start of a DMA
+ * transfer, so I won't need to configure the CB registers directly
+ */
+typedef struct dma_cb_t {
+    uint32_t ti;
+    uint32_t source_ad;
+    uint32_t dest_ad;
+    uint32_t txfr_len;
+    uint32_t stride;
+    uint32_t nextconbk;
+    uint32_t _reserved1; // padding; don't use!
+    uint32_t _reserved2; // padding; don't use!
+} dma_cb_t;
+
 /**************************************************************************************
  * GLOBALS
  **************************************************************************************/
@@ -233,6 +305,13 @@ static struct proc_dir_entry *ws2812_proc = NULL;
 static volatile unsigned int *gpio_registers = NULL;
 static volatile unsigned int *pwm_registers = NULL;
 static volatile unsigned int *cm_registers = NULL;
+static volatile unsigned int *dma_registers = NULL;
+
+// define DMA-related globals
+dma_cb_t *dma_cb = NULL;
+dma_addr_t cb_phys;
+uint32_t *dma_buffer = NULL;
+dma_addr_t dma_buffer_phys;
 
 /**************************************************************************************
  * FUNCTION PROTOTYPES
