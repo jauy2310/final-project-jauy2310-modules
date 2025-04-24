@@ -19,9 +19,10 @@
 
 // extra linux header includes
 #include <linux/slab.h>             // memory allocation
-#include <linux/proc_fs.h>          // expose the /proc filesystem
 #include <asm/io.h>                 // provides arch-specific memory mapping
 #include <linux/dma-mapping.h>      // provides memory mapping for DMA peripheral
+#include <linux/fs.h>               // file operations
+#include <linux/cdev.h>             // character device
 
 // local includes
 #include "log.h"
@@ -295,12 +296,29 @@ typedef struct dma_cb_t {
     uint32_t _reserved2; // padding; don't use!
 } dma_cb_t;
 
+/**
+ * struct ws2812_dev
+ * 
+ * Defines the structure of the module's device
+ */
+struct ws2812_dev {
+    // linked list representation of the led strip
+    struct led_node *led_strip;
+
+    // dma buffer and physical handle
+    uint32_t *dma_buffer;
+    dma_addr_t dma_buffer_phys;
+
+    // char device
+    struct cdev cdev;
+
+    // device for DMA
+    struct device *device;
+};
+
 /**************************************************************************************
  * GLOBALS
  **************************************************************************************/
-// define an entry into the /proc device
-static struct proc_dir_entry *ws2812_proc = NULL;
-
 // define the registers for the GPIO peripheral
 static volatile unsigned int *gpio_registers = NULL;
 static volatile unsigned int *pwm_registers = NULL;
@@ -310,8 +328,13 @@ static volatile unsigned int *dma_registers = NULL;
 // define DMA-related globals
 dma_cb_t *dma_cb = NULL;
 dma_addr_t cb_phys;
-uint32_t *dma_buffer = NULL;
-dma_addr_t dma_buffer_phys;
+
+// define device-related globals
+int ws2812_major = 0;
+int ws2812_minor = 0;
+int ws2812_dev_no = 0;
+static struct class *ws2812_class;
+static struct ws2812_dev ws2812_device;
 
 /**************************************************************************************
  * FUNCTION PROTOTYPES
