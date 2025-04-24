@@ -399,6 +399,7 @@ static int ws2812_init(void) {
     ws2812_device.cdev.owner = THIS_MODULE;
     result = cdev_add(&ws2812_device.cdev, dev, 1);
     if (result < 0) {
+        LOGE("> Error registering the char device: %d", result);
         dma_free_coherent(ws2812_device.device, 200 * sizeof(uint32_t), ws2812_device.dma_buffer, ws2812_device.dma_buffer_phys);
         device_destroy(ws2812_class, ws2812_dev_no);
         class_destroy(ws2812_class);
