@@ -24,6 +24,7 @@
 #include <linux/dma-mapping.h>      // provides memory mapping for DMA peripheral
 #include <linux/fs.h>               // file operations
 #include <linux/cdev.h>             // character device
+#include <linux/platform_device.h>  // platform device
 
 // local includes
 #include "log.h"
@@ -319,6 +320,9 @@ struct ws2812_dev {
 
     // device for DMA
     struct device *device;
+
+    // platform driver
+    struct platform_device *pdev;
 };
 
 /**************************************************************************************

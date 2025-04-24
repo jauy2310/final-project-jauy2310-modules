@@ -370,8 +370,15 @@ static int ws2812_init(void) {
         return PTR_ERR(ws2812_class);
     }
 
+    // create a platform device
+    ws2812_device.pdev = platform_device_register_simple("ws2812-dma", -1, NULL, 0);
+    if (IS_ERR(ws2812_device.pdev)) {
+        LOGE("> Error creating a platform device.");
+        return PTR_ERR(ws2812_device.pdev);
+    }
+
     // creeate a device
-    ws2812_device.device = device_create(ws2812_class, NULL, ws2812_dev_no, NULL, WS2812_MODULE_NAME);
+    ws2812_device.device = device_create(ws2812_class, &ws2812_device.pdev->dev, ws2812_dev_no, NULL, WS2812_MODULE_NAME);
     if (IS_ERR(ws2812_device.device)) {
         LOGE("> Error creating a device.");
         class_destroy(ws2812_class);
