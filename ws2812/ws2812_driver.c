@@ -363,7 +363,6 @@ static int ws2812_init(void) {
     #else
         ws2812_class = class_create(WS2812_MODULE_NAME);
     #endif
-
     if (IS_ERR(ws2812_class)) {
         LOGE("> Error setting up a device class.");
         unregister_chrdev_region(ws2812_dev_no, 1);
@@ -380,7 +379,7 @@ static int ws2812_init(void) {
     }
 
     // allocate DMA buffer
-    ws2812_device.dma_buffer = dma_alloc_coherent(ws2812_device.device, 200, &ws2812_device.dma_buffer_phys, GFP_KERNEL);
+    ws2812_device.dma_buffer = dma_alloc_coherent(ws2812_device.device, 200 * sizeof(uint32_t), &ws2812_device.dma_buffer_phys, GFP_KERNEL);
     if (ws2812_device.dma_buffer == NULL) {
         LOGE("> No memory to allocate the DMA buffer.");
         device_destroy(ws2812_class, ws2812_dev_no);
@@ -399,7 +398,7 @@ static int ws2812_init(void) {
     ws2812_device.cdev.owner = THIS_MODULE;
     result = cdev_add(&ws2812_device.cdev, dev, 1);
     if (result < 0) {
-        dma_free_coherent(ws2812_device.device, 200, ws2812_device.dma_buffer, ws2812_device.dma_buffer_phys);
+        dma_free_coherent(ws2812_device.device, 200 * sizeof(uint32_t), ws2812_device.dma_buffer, ws2812_device.dma_buffer_phys);
         device_destroy(ws2812_class, ws2812_dev_no);
         class_destroy(ws2812_class);
         unregister_chrdev_region(ws2812_dev_no, 1);
@@ -456,7 +455,7 @@ static void ws2812_exit(void) {
      * UNREGISTER MODULE
      *****************************/
     cdev_del(&ws2812_device.cdev);
-    dma_free_coherent(ws2812_device.device, 200, ws2812_device.dma_buffer, ws2812_device.dma_buffer_phys);
+    dma_free_coherent(ws2812_device.device, 200 * sizeof(uint32_t), ws2812_device.dma_buffer, ws2812_device.dma_buffer_phys);
     device_destroy(ws2812_class, ws2812_dev_no);
     class_destroy(ws2812_class);
     unregister_chrdev_region(ws2812_dev_no, 1);
@@ -467,7 +466,7 @@ static void ws2812_exit(void) {
     // free the DMA-accessible memory for the dma_buffer
     if (ws2812_device.dma_buffer != NULL) {
         LOG("> Freeing DMA-accessible memory for the DMA buffer.");
-        dma_free_coherent(ws2812_device.device, 200, ws2812_device.dma_buffer, ws2812_device.dma_buffer_phys);
+        dma_free_coherent(ws2812_device.device, 200 * sizeof(uint32_t), ws2812_device.dma_buffer, ws2812_device.dma_buffer_phys);
         ws2812_device. dma_buffer = NULL;
     }
 
