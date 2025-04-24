@@ -222,8 +222,8 @@ static int dma_configure(void) {
     
     // create a control block structure
     LOG("+ Allocating DMA-accessible control block.");
-    dma_cb = dma_alloc_coherent(ws2812_device.device, sizeof(dma_cb_t), &cb_phys, GFP_KERNEL);
-    if (dma_cb == NULL) {
+    ws2812_device.dma_cb = dma_alloc_coherent(ws2812_device.device, sizeof(dma_cb_t), &ws2812_device.cb_phys, GFP_KERNEL);
+    if (ws2812_device.dma_cb == NULL) {
         LOGE("- Error allocating memory for DMA handle.");
         return -ENOMEM;
     }
@@ -231,16 +231,16 @@ static int dma_configure(void) {
     // fill the control block
     // DMA controller uses the bus addresses, not the virtually-mapped addresses, so dest_ad = bus address
     LOG("+ Configuring DMA control block structure.");
-    dma_cb->ti = DMA_TI_SRCINC(1) | DMA_TI_DESTDREQ(1) | DMA_TI_PERMAP(DMA_PERMAP_PWM);
-    dma_cb->source_ad = ws2812_device.dma_buffer_phys;
-    dma_cb->dest_ad = PWM_BUS_BASE_ADDRESS + PWM_FIF1_OFFSET;
-    dma_cb->txfr_len = 200; // TODO: change this to the length of the LED buffer; adding/removing leds require this to update
-    dma_cb->stride = 0;
-    dma_cb->nextconbk = cb_phys; // repeat the buffer
+    ws2812_device.dma_cb->ti = DMA_TI_SRCINC(1) | DMA_TI_DESTDREQ(1) | DMA_TI_PERMAP(DMA_PERMAP_PWM);
+    ws2812_device.dma_cb->source_ad = ws2812_device.dma_buffer_phys;
+    ws2812_device.dma_cb->dest_ad = PWM_BUS_BASE_ADDRESS + PWM_FIF1_OFFSET;
+    ws2812_device.dma_cb->txfr_len = 200; // TODO: change this to the length of the LED buffer; adding/removing leds require this to update
+    ws2812_device.dma_cb->stride = 0;
+    ws2812_device.dma_cb->nextconbk = ws2812_device.cb_phys; // repeat the buffer
 
     // set the control block address
     LOG("+ Setting the configured control block to the DMA's settings.");
-    *dma_conblkad = cb_phys;
+    *dma_conblkad = ws2812_device.cb_phys;
 
     // enable DMA channel
     LOG("+ DMA Configuration Complete! Enabling peripheral.");
@@ -269,10 +269,10 @@ static void dma_cleanup(void) {
     *dma_conblkad = 0;  // Clear the control block address
 
     // free any allocated DMA resources if necessary
-    if (dma_cb != NULL) {
-        dma_free_coherent(NULL, sizeof(dma_cb_t), dma_cb, cb_phys);  // Free the control block
-        dma_cb = NULL;
-        cb_phys = 0;
+    if (ws2812_device.dma_cb != NULL) {
+        dma_free_coherent(NULL, sizeof(dma_cb_t), ws2812_device.dma_cb, ws2812_device.cb_phys);  // Free the control block
+        ws2812_device.dma_cb = NULL;
+        ws2812_device.cb_phys = 0;
     }
 
     // dma cleaned up

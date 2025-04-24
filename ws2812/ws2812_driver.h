@@ -310,6 +310,10 @@ struct ws2812_dev {
     uint32_t *dma_buffer;
     dma_addr_t dma_buffer_phys;
 
+    // dma control block
+    dma_cb_t *dma_cb;
+    dma_addr_t cb_phys;
+
     // char device
     struct cdev cdev;
 
@@ -327,8 +331,6 @@ static volatile unsigned int *cm_registers = NULL;
 static volatile unsigned int *dma_registers = NULL;
 
 // define DMA-related globals
-dma_cb_t *dma_cb = NULL;
-dma_addr_t cb_phys;
 
 // define device-related globals
 int ws2812_major = 0;
