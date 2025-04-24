@@ -16,6 +16,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/version.h>
 
 // extra linux header includes
 #include <linux/slab.h>             // memory allocation

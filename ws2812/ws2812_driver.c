@@ -294,6 +294,7 @@ static int ws2812_init(void) {
      *****************************/
     // initialization setup
     int result = 0;
+    dev_t dev;
     
     // start driver load
     LOG("Starting WS2812B LED Kernel Module Load.");
@@ -346,7 +347,7 @@ static int ws2812_init(void) {
      * REGISTER MODULE
      *****************************/
     // allocate a device
-    dev_t dev = 0;
+    dev = 0;
     result = alloc_chrdev_region(&dev, ws2812_minor, 1, WS2812_MODULE_NAME);
     ws2812_major = MAJOR(dev);
     if (result < 0) {
@@ -357,7 +358,12 @@ static int ws2812_init(void) {
     ws2812_dev_no = dev;
 
     // create a class
-    ws2812_class = class_create(WS2812_MODULE_NAME);
+    #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 67)
+        ws2812_class = class_create(THIS_MODULE, WS2812_MODULE_NAME);
+    #else
+        ws2812_class = class_create(WS2812_MODULE_NAME);
+    #endif
+
     if (IS_ERR(ws2812_class)) {
         LOGE("> Error setting up a device class.");
         unregister_chrdev_region(ws2812_dev_no, 1);
