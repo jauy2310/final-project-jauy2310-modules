@@ -13,7 +13,8 @@ EXTRA_CFLAGS += $(DEBFLAGS)
 
 ifneq ($(KERNELRELEASE),)
 # call from kernel build system
-obj-m := platform_dev.o
+ws2812-objs := platform_dev.o
+obj-m := ws2812_pdev.o
 else
 
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
