@@ -1,0 +1,5 @@
+#!/bin/sh
+module=ws2812
+device=ws2812
+cd `dirname $0`
+rmmod $module || exit 1
