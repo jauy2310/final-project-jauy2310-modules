@@ -8,6 +8,7 @@
 #include <linux/init.h>                 // init/exit
 #include <linux/cdev.h>                 // cdev
 #include <linux/mod_devicetable.h>      // device tables (associate module to device)
+#include <linux/device.h>               // device definitions
 
 // local includes
 #include "log.h"
