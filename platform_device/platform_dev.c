@@ -1,5 +1,9 @@
 #include "platform_dev.h"
 
+// module information
+MODULE_AUTHOR("Jake Uyechi");
+MODULE_LICENSE("GPL");
+
 /**************************************************************************************
  * MODULE GLOBALS
  **************************************************************************************/
@@ -153,7 +157,3 @@ static void __exit ws2812_exit(void) {
 // register module entry/exit points
 module_init(ws2812_init);
 module_exit(ws2812_exit);
-
-// module information
-MODULE_AUTHOR("Jake Uyechi");
-MODULE_LICENSE("GPL");
