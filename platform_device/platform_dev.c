@@ -63,8 +63,8 @@ static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t le
 // module probe (for platform driver)
 static int ws2812_probe(struct platform_device *pdev) {
     // function setup
-    LOG("Probing Test Platform Driver.");
     int retval = 0;
+    LOG("Probing Test Platform Driver.");
 
     // create area in memory for the char device
     retval = alloc_chrdev_region(&ws2812_devno, ws2812_minor, 1, MODULE_NAME);
@@ -87,7 +87,7 @@ static int ws2812_probe(struct platform_device *pdev) {
     }
 
     // create device class
-    ws2812_device.class = class_create(MODULE_NAME);
+    ws2812_device.class = class_create(THIS_MODULE, MODULE_NAME);
     if (IS_ERR(ws2812_device.class)) {
         retval = PTR_ERR(ws2812_device.class);
         LOGE("Error creating class.");
