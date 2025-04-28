@@ -11,6 +11,8 @@ endif
 
 EXTRA_CFLAGS += $(DEBFLAGS)
 
+all: modules
+
 ifneq ($(KERNELRELEASE),)
 # call from kernel build system
 obj-m := platform_dev.o
