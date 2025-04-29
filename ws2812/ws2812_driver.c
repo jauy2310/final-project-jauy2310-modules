@@ -242,7 +242,7 @@ static int pwm_configure(void) {
     LOG("+ Configuring CTL register.");
     *pwm_ctl &= ~(PWM_CTL_MODE1_MASK);          // set to PWM mode
     *pwm_ctl &= ~(PWM_CTL_SBIT1_MASK);          // pull LOW between transfers (TODO: change after testing)
-    *pwm_ctl |= PWM_CTL_USEF1(1);               // enable FIFO
+    *pwm_ctl |= PWM_CTL_USEF1(0);               // disable FIFO (TODO: change after testing)
     *pwm_ctl |= PWM_CTL_MSEN1(1);               // enable Mark-Space (M/S) mode
     LOG("+ PWM_CTL [%p]: 0x%08X", pwm_ctl, *pwm_ctl);
 
@@ -497,7 +497,10 @@ static int __init ws2812_init(void) {
      *****************************/
     // configure GPIO
     LOG("> Configuring GPIO.");
-    gpio_configure(WS2812_GPIO_PIN, GPFSEL_OUTPUT);
+    gpio_configure(WS2812_GPIO_PIN, GPFSEL_ALT5);
+
+    LOG("> Configuring GPIO.");
+    pwm_configure();
     gpio_set(WS2812_GPIO_PIN);
 
     return 0;
