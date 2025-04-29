@@ -237,6 +237,7 @@ static int pwm_configure(void) {
     // disable PWM for configuration
     LOG("+ Disabling PWM for configuration.");
     *pwm_ctl &= ~(PWM_CTL_PWEN1_MASK);
+    udelay(10);
 
     // configure the CTL register
     LOG("+ Configuring CTL register.");
@@ -256,12 +257,14 @@ static int pwm_configure(void) {
     *pwm_rng1 &= ~(PWM_RNG1_MASK);
     *pwm_rng1 |= PWM_RNG1(100);                 // set the range to 100 (percentage-based duty cycle)
     LOG("+ PWM_RNG1 [%p]: 0x%08X", pwm_rng1, *pwm_rng1);
+    udelay(10);
 
     // configure the DAT1 register
     LOG("+ Configuring DAT1 register.");
     *pwm_dat1 &= ~(PWM_DAT1_MASK);
     *pwm_dat1 |= PWM_DAT1(25);                  // set the duty cycle
     LOG("+ PWM_DAT1 [%p]: 0x%08X", pwm_dat1, *pwm_dat1);
+    udelay(10);
 
     // configuration complete; enable PWM
     LOG("+ PWM Configuration Complete! Enabling peripheral.");

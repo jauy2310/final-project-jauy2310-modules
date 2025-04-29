@@ -27,6 +27,7 @@
 #include <linux/platform_device.h>  // platform device
 #include <linux/miscdevice.h>       // misc. device interface
 #include <linux/uaccess.h>          // user/kernel memory interfacing
+#include <linux/delay.h>            // delays
 
 // local includes
 #include "log.h"
