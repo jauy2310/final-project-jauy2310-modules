@@ -18,6 +18,7 @@
  * MACROS/DEFINES
  **************************************************************************************/
 #define NUM_GPIO_PINS 53
+#define LED_PIN 18
 /**
  * CLOCK/PWM CONFIGURATION
  * 
