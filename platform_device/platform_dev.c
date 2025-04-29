@@ -91,7 +91,7 @@ static int ws2812_probe(struct platform_device *pdev) {
     }
 
     // create device class
-    ws2812_device.class = class_create(THIS_MODULE, MODULE_NAME);
+    ws2812_device.class = class_create(MODULE_NAME);
     if (IS_ERR(ws2812_device.class)) {
         retval = PTR_ERR(ws2812_device.class);
         LOGE("Error creating class.");
