@@ -1,7 +1,6 @@
 #!/bin/sh
 
-module=platform_dev
-device=platform_dev
+module=led
 mode="666"
 cd `dirname $0`
 set -e

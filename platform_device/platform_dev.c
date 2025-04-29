@@ -111,11 +111,11 @@ static ssize_t led_write(struct file *file, const char __user *buf, size_t count
     if (kbuf == '1') {
         led_state = 1;
         pr_info("LED turned ON\n");
-        // TODO: Add actual GPIO or PWM control here
+        gpio_set(LED_PIN);
     } else if (kbuf == '0') {
         led_state = 0;
         pr_info("LED turned OFF\n");
-        // TODO: Add actual GPIO or PWM control here
+        gpio_clear(LED_PIN);
     } else {
         return -EINVAL;
     }
@@ -201,8 +201,8 @@ static int __init led_init(void)
         LOG("> GPIO peripheral mapped in memory at 0x%p.", gpio_registers);
     }
 
-    gpio_configure(18, GPFSEL_OUTPUT);
-    gpio_set(18);
+    gpio_configure(LED_PIN, GPFSEL_OUTPUT);
+    gpio_set(LED_PIN);
 
     ret = platform_driver_register(&led_platform_driver);
     if (ret)
@@ -223,7 +223,7 @@ static void __exit led_exit(void)
     platform_device_unregister(led_platform_device);
     platform_driver_unregister(&led_platform_driver);
 
-    gpio_clear(18);
+    gpio_clear(LED_PIN);
     
     // unmap the GPIO peripheral from memory
     if (gpio_registers != NULL) {
