@@ -1,159 +1,137 @@
 #include "platform_dev.h"
 
-// module information
-MODULE_AUTHOR("Jake Uyechi");
-MODULE_LICENSE("GPL");
+// File operations
+static ssize_t led_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
+{
+    char state = led_state ? '1' : '0';
+    if (*ppos > 0)
+        return 0; // EOF
 
-/**************************************************************************************
- * MODULE GLOBALS
- **************************************************************************************/
+    if (copy_to_user(buf, &state, 1))
+        return -EFAULT;
 
-// define device major/minor numbers
-static int ws2812_major = 0;
-static int ws2812_minor = 0;
+    *ppos += 1;
+    return 1;
+}
 
-// define a global reference to device struct
-struct ws2812_dev ws2812_device;
-static dev_t ws2812_devno;
+static ssize_t led_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
+{
+    char kbuf;
 
-// create file operations table
-static const struct file_operations ws2812_fops = {
+    if (count < 1)
+        return -EINVAL;
+
+    if (copy_from_user(&kbuf, buf, 1))
+        return -EFAULT;
+
+    if (kbuf == '1') {
+        led_state = 1;
+        pr_info("LED turned ON\n");
+        // TODO: Add actual GPIO or PWM control here
+    } else if (kbuf == '0') {
+        led_state = 0;
+        pr_info("LED turned OFF\n");
+        // TODO: Add actual GPIO or PWM control here
+    } else {
+        return -EINVAL;
+    }
+
+    return 1;
+}
+
+static int led_open(struct inode *inode, struct file *file)
+{
+    pr_info("LED device opened\n");
+    return 0;
+}
+
+static int led_release(struct inode *inode, struct file *file)
+{
+    pr_info("LED device closed\n");
+    return 0;
+}
+
+static const struct file_operations led_fops = {
     .owner = THIS_MODULE,
-    .open = ws2812_open,
-    .release = ws2812_release,
-    .write = ws2812_write
+    .read = led_read,
+    .write = led_write,
+    .open = led_open,
+    .release = led_release,
 };
 
-// open firmware match table
-static const struct of_device_id ws2812_match_table[] = {
-    { .compatible = "ws2812" },
-    {},
+// Misc device structure
+static struct miscdevice led_misc_device = {
+    .minor = MISC_DYNAMIC_MINOR,
+    .name = DEVICE_NAME,
+    .fops = &led_fops,
 };
 
-// platform driver structure
-static struct platform_driver ws2812_pdriver = {
+// Platform driver
+static int led_probe(struct platform_device *pdev)
+{
+    int ret;
+
+    pr_info("LED platform device probed\n");
+
+    ret = misc_register(&led_misc_device);
+    if (ret) {
+        pr_err("Failed to register misc device\n");
+        return ret;
+    }
+
+    return 0;
+}
+
+static int led_remove(struct platform_device *pdev)
+{
+    pr_info("LED platform device removed\n");
+    misc_deregister(&led_misc_device);
+    return 0;
+}
+
+static struct platform_driver led_platform_driver = {
     .driver = {
-        .name = MODULE_NAME,
+        .name = "led_device",
         .owner = THIS_MODULE,
-        .of_match_table = ws2812_match_table,
     },
-    .probe = ws2812_probe,
-    .remove = ws2812_remove,
+    .probe = led_probe,
+    .remove = led_remove,
 };
 
-/**************************************************************************************
- * MODULE IMPLEMENTATION
- **************************************************************************************/
+// Manual platform device (optional, for quick testing without DT)
+static struct platform_device *led_platform_device;
 
-static int ws2812_open(struct inode *inode, struct file *file) {
-    LOG("Device opened.");
+// Module init and exit
+static int __init led_init(void)
+{
+    int ret;
+
+    pr_info("LED driver initializing\n");
+
+    ret = platform_driver_register(&led_platform_driver);
+    if (ret)
+        return ret;
+
+    // Register platform device manually (if no device tree)
+    led_platform_device = platform_device_register_simple("led_device", -1, NULL, 0);
+    if (IS_ERR(led_platform_device)) {
+        platform_driver_unregister(&led_platform_driver);
+        return PTR_ERR(led_platform_device);
+    }
+
     return 0;
 }
 
-static int ws2812_release(struct inode *inode, struct file *file) {
-    LOG("Device released.");
-    return 0;
+static void __exit led_exit(void)
+{
+    platform_device_unregister(led_platform_device);
+    platform_driver_unregister(&led_platform_driver);
+    pr_info("LED driver exiting\n");
 }
 
-static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t len, loff_t *offset) {
-    LOG("WS2812 Write (size: %zu)", len);
-    return len;
-}
+module_init(led_init);
+module_exit(led_exit);
 
-/**************************************************************************************
- * MODULE INIT/EXIT/PROBE/REMOVE FUNCTIONS
- **************************************************************************************/
-
-// module probe (for platform driver)
-static int ws2812_probe(struct platform_device *pdev) {
-    // function setup
-    int retval = 0;
-    LOG("Probing Test Platform Driver.");
-
-    // create area in memory for the char device
-    retval = alloc_chrdev_region(&ws2812_devno, ws2812_minor, 1, MODULE_NAME);
-    if (retval != 0) {
-        LOGE("Error allocating character device region.");
-        goto cleanup;
-    }
-    ws2812_major = MAJOR(ws2812_devno);
-    memset(&ws2812_device, 0, sizeof(struct ws2812_dev));
-
-    // initialize char device
-    cdev_init(&ws2812_device.cdev, &ws2812_fops);
-    ws2812_device.cdev.owner = THIS_MODULE;
-
-    // add cdev to kernel
-    retval = cdev_add(&ws2812_device.cdev, ws2812_devno, 1);
-    if (retval != 0) {
-        LOGE("Error adding cdev.");
-        goto unregister_chrdev;
-    }
-
-    // create device class
-    ws2812_device.class = class_create(THIS_MODULE, MODULE_NAME);
-    if (IS_ERR(ws2812_device.class)) {
-        retval = PTR_ERR(ws2812_device.class);
-        LOGE("Error creating class.");
-        goto del_cdev;
-    }
-
-    // create device
-    ws2812_device.device = device_create(ws2812_device.class, NULL, ws2812_devno, NULL, MODULE_NAME);
-    if (IS_ERR(ws2812_device.device)) {
-        retval = PTR_ERR(ws2812_device.device);
-        LOGE("Error creating device.");
-        goto destroy_class;
-    }
-
-    // return success
-    return 0;
-
-    // cleanup labels 
-destroy_class:
-    class_destroy(ws2812_device.class);
-del_cdev:
-    cdev_del(&ws2812_device.cdev);
-unregister_chrdev:
-    unregister_chrdev_region(ws2812_devno, 1);
-cleanup:
-    return retval;
-}
-
-// module remove (for platform driver)
-static int ws2812_remove(struct platform_device *pdev) {
-    // function setup
-    LOG("Removing Test Platform Driver.");
-
-    // destroy the device registration
-    device_destroy(ws2812_device.class, ws2812_devno);
-
-    // destroy the class registration
-    class_destroy(ws2812_device.class);
-
-    // delete the cdev
-    cdev_del(&ws2812_device.cdev);
-
-    // unregister the memory region for the char device
-    unregister_chrdev_region(ws2812_devno, 1);
-    
-    // return
-    return 0;
-}
-
-
-// module init
-static int __init ws2812_init(void) {
-    LOG("Loading Test Platform Driver.");
-    return platform_driver_register(&ws2812_pdriver);
-}
-
-// module exit
-static void __exit ws2812_exit(void) {
-    LOG("Unloading Test Platform Driver.");
-    platform_driver_unregister(&ws2812_pdriver);
-}
-
-// register module entry/exit points
-module_init(ws2812_init);
-module_exit(ws2812_exit);
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Your Name");
+MODULE_DESCRIPTION("Simple Platform Driver with /dev/led");

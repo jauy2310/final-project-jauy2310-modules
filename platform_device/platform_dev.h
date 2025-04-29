@@ -1,15 +1,11 @@
 #ifndef _PLATFORM_DEV_H_
 #define _PLATFORM_DEV_H_
 
-#include <linux/fs.h>                   // linux file system
-#include <linux/kernel.h>               // kernel
-#include <linux/module.h>               // generic kernel module
-#include <linux/platform_device.h>      // platform devices
-#include <linux/init.h>                 // init/exit
-#include <linux/cdev.h>                 // cdev
-#include <linux/mod_devicetable.h>      // device tables (associate module to device)
-#include <linux/device.h>               // device definitions
-#include <linux/device/class.h>
+#include <linux/module.h>
+#include <linux/platform_device.h>
+#include <linux/fs.h>
+#include <linux/miscdevice.h>
+#include <linux/uaccess.h>
 
 // local includes
 #include "log.h"
@@ -22,7 +18,7 @@ typedef struct led_node {
 } led_node;
 
 // module definitions
-#define MODULE_NAME "ws2812"
+#define DEVICE_NAME "led"
 #define MAX_LEDS 100
 
 // platform driver/char device definition
@@ -35,6 +31,8 @@ struct ws2812_dev {
     // driver-specific
     led_node led_strip[MAX_LEDS];
 };
+
+static char led_state = 0; // 0 = OFF, 1 = ON
 
 // function prototypes
 static int ws2812_open(struct inode *inode, struct file *file);
