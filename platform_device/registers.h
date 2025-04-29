@@ -1,5 +1,5 @@
-#ifndef _WS2812_H_
-#define _WS2812_H_
+#ifndef _REGISTERS_H_
+#define _REGISTERS_H_
 
 /**************************************************************************************
  * INCLUDES
@@ -12,34 +12,13 @@
 #include <stdbool.h>
 #endif
 
-// kernel module includes
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/init.h>
-#include <linux/version.h>
-
-// extra linux header includes
-#include <linux/slab.h>             // memory allocation
-#include <asm/io.h>                 // provides arch-specific memory mapping
-#include <linux/dma-mapping.h>      // provides memory mapping for DMA peripheral
-#include <linux/fs.h>               // file operations
-#include <linux/cdev.h>             // character device
-#include <linux/platform_device.h>  // platform device
-
-// local includes
-#include "log.h"
-#include "led.h"
+#include <asm/io.h>
 
 /**************************************************************************************
  * MACROS/DEFINES
  **************************************************************************************/
-// Broadcom (BCM) defines
-#define NUM_GPIO_PINS                       53
-
-// define module information
-#define WS2812_MODULE_NAME                  "ws2812"
-#define WS2812_GPIO_PIN                     18
-
+#define NUM_GPIO_PINS 53
+#define LED_PIN 12
 /**
  * CLOCK/PWM CONFIGURATION
  * 
@@ -298,53 +277,9 @@ typedef struct dma_cb_t {
     uint32_t _reserved2; // padding; don't use!
 } dma_cb_t;
 
-/**
- * struct ws2812_dev
- * 
- * Defines the structure of the module's device
- */
-struct ws2812_dev {
-    // linked list representation of the led strip
-    struct led_node *led_strip;
-
-    // dma buffer and physical handle
-    uint32_t *dma_buffer;
-    dma_addr_t dma_buffer_phys;
-
-    // dma control block
-    dma_cb_t *dma_cb;
-    dma_addr_t cb_phys;
-
-    // char device
-    struct cdev cdev;
-
-    // device for DMA
-    struct device *device;
-
-    // platform driver
-    struct platform_device *pdev;
-};
-
 /**************************************************************************************
  * GLOBALS
  **************************************************************************************/
-// define the registers for the GPIO peripheral
 static volatile unsigned int *gpio_registers = NULL;
-static volatile unsigned int *pwm_registers = NULL;
-static volatile unsigned int *cm_registers = NULL;
-static volatile unsigned int *dma_registers = NULL;
 
-// define DMA-related globals
-
-// define device-related globals
-int ws2812_major = 0;
-int ws2812_minor = 0;
-int ws2812_dev_no = 0;
-static struct class *ws2812_class;
-static struct ws2812_dev ws2812_device;
-
-/**************************************************************************************
- * FUNCTION PROTOTYPES
- **************************************************************************************/
-
-# endif /* _WS2812_H_ */
+# endif /* _REGISTERS_H_ */

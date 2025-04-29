@@ -1,0 +1,6 @@
+#!/bin/sh
+
+module=led
+cd `dirname $0`
+
+rmmod $module || exit 1

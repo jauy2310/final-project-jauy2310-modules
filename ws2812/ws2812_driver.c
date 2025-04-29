@@ -11,7 +11,7 @@ MODULE_AUTHOR("Jake Uyechi");
 /**************************************************************************************
  * MODULE IMPLEMENTATION
  **************************************************************************************/
-static const struct proc_ops fops = {
+struct file_operations ws2812_fops = {
     // file operations
 };
 
@@ -177,14 +177,13 @@ static int pwm_configure(void) {
     LOG("+ Configuring CTL register.");
     *pwm_ctl &= ~(PWM_CTL_MODE1_MASK);          // set to PWM mode
     *pwm_ctl &= ~(PWM_CTL_SBIT1_MASK);          // pull LOW between transfers (TODO: change after testing)
-    *pwm_ctl &= ~(PWM_CTL_USEF1_MASK);          // disable FIFO (TODO: change after testing)
-    *pwm_ctl &= ~(PWM_CTL_MSEN1_MASK);
+    *pwm_ctl |= PWM_CTL_USEF1(1);               // enable FIFO
     *pwm_ctl |= PWM_CTL_MSEN1(1);               // enable Mark-Space (M/S) mode
     LOG("+ PWM_CTL [%p]: 0x%08X", pwm_ctl, *pwm_ctl);
 
     // configure the DMAC register
     LOG("+ Configuring DMAC register.");
-    *pwm_dmac &= ~(PWM_DMAC_ENAB_MASK);         // disable DMA (TODO: change after testing)
+    *pwm_dmac |= PWM_DMAC_ENAB(1);              // enable DMA
     LOG("+ PWM_DMAC [%p]: 0x%08X", pwm_dmac, *pwm_dmac);
     
     // configure the RNG1 register
@@ -207,6 +206,80 @@ static int pwm_configure(void) {
     return 0;
 }
 
+/**
+ * dma_configure()
+ * 
+ * Configure DMA peripheral using memory-mapped physical address
+ */
+static int dma_configure(void) {
+    // function setup
+    volatile unsigned int *dma_cs = DMA_REG(DMA_CS_OFFSET);
+    volatile unsigned int *dma_conblkad = DMA_REG(DMA_CONBLKAD_OFFSET);
+
+    // disable DMA channel
+    LOG("+ Disabling DMA for configuration.");
+    *dma_cs &= ~(DMA_CS_ACTIVE_MASK);
+    
+    // create a control block structure
+    LOG("+ Allocating DMA-accessible control block.");
+    ws2812_device.dma_cb = dma_alloc_coherent(ws2812_device.device, sizeof(dma_cb_t), &ws2812_device.cb_phys, GFP_KERNEL);
+    if (ws2812_device.dma_cb == NULL) {
+        LOGE("- Error allocating memory for DMA handle.");
+        return -ENOMEM;
+    }
+
+    // fill the control block
+    // DMA controller uses the bus addresses, not the virtually-mapped addresses, so dest_ad = bus address
+    LOG("+ Configuring DMA control block structure.");
+    ws2812_device.dma_cb->ti = DMA_TI_SRCINC(1) | DMA_TI_DESTDREQ(1) | DMA_TI_PERMAP(DMA_PERMAP_PWM);
+    ws2812_device.dma_cb->source_ad = ws2812_device.dma_buffer_phys;
+    ws2812_device.dma_cb->dest_ad = PWM_BUS_BASE_ADDRESS + PWM_FIF1_OFFSET;
+    ws2812_device.dma_cb->txfr_len = 200; // TODO: change this to the length of the LED buffer; adding/removing leds require this to update
+    ws2812_device.dma_cb->stride = 0;
+    ws2812_device.dma_cb->nextconbk = ws2812_device.cb_phys; // repeat the buffer
+    LOG("+ DMA control block allocated at %p (phys: %pa)", ws2812_device.dma_cb, &ws2812_device.cb_phys);
+
+    // set the control block address
+    LOG("+ Setting the configured control block to the DMA's settings.");
+    *dma_conblkad = ws2812_device.cb_phys;
+
+    // enable DMA channel
+    LOG("+ DMA Configuration Complete! Enabling peripheral.");
+    *dma_cs |= DMA_CS_ACTIVE(1);
+
+    // return 
+    return 0;
+}
+
+/**
+ * dma_cleanup()
+ * 
+ * Deconfigures the DMA
+ */
+static void dma_cleanup(void) {
+    // function setup
+    volatile unsigned int *dma_cs = DMA_REG(DMA_CS_OFFSET);
+    volatile unsigned int *dma_conblkad = DMA_REG(DMA_CONBLKAD_OFFSET);
+
+    // disable DMA channel
+    LOG("+ Disabling DMA channel.");
+    *dma_cs &= ~(DMA_CS_ACTIVE_MASK);  // Clear the ACTIVE bit to stop the DMA transfer
+
+    // clear the control block address
+    LOG("+ Clearing DMA control block address.");
+    *dma_conblkad = 0;  // Clear the control block address
+
+    // free any allocated DMA resources if necessary
+    if (ws2812_device.dma_cb != NULL) {
+        dma_free_coherent(NULL, sizeof(dma_cb_t), ws2812_device.dma_cb, ws2812_device.cb_phys);  // Free the control block
+        ws2812_device.dma_cb = NULL;
+        ws2812_device.cb_phys = 0;
+    }
+
+    // dma cleaned up
+    LOG("DMA deconfiguration complete.");
+}
+
 /**************************************************************************************
  * MODULE LOAD/UNLOAD FUNCTIONS
  **************************************************************************************/
@@ -222,6 +295,7 @@ static int ws2812_init(void) {
      *****************************/
     // initialization setup
     int result = 0;
+    dev_t dev;
     
     // start driver load
     LOG("Starting WS2812B LED Kernel Module Load.");
@@ -259,18 +333,85 @@ static int ws2812_init(void) {
         LOG("> CM peripheral mapped in memory at 0x%p.", cm_registers);
     }
 
+    dma_registers = (volatile unsigned int *)ioremap(DMA_CHANNEL_BASE_ADDRESS, PAGE_SIZE);
+    if (dma_registers == NULL) {
+        LOGE("> DMA peripheral cannot be remapped.");
+        iounmap(cm_registers);
+        iounmap(pwm_registers);
+        iounmap(gpio_registers);
+        return -ENOMEM;
+    } else {
+        LOG("> DMA peripheral mapped in memory at 0x%p.", dma_registers);
+    }
 
     /*****************************
      * REGISTER MODULE
      *****************************/
-    // create an entry in procfs
-    ws2812_proc = proc_create(WS2812_MODULE_NAME, 0666, NULL, &fops);
-    if (ws2812_proc == NULL) {
-        LOGE("> Unable to create entry in procfs.");
-        iounmap(gpio_registers);
+    // allocate a device
+    dev = 0;
+    result = alloc_chrdev_region(&dev, ws2812_minor, 1, WS2812_MODULE_NAME);
+    ws2812_major = MAJOR(dev);
+    if (result < 0) {
+        LOGE("> Error getting device major.");
+        return result;
+    }
+    memset(&ws2812_device, 0, sizeof(struct ws2812_dev));
+    ws2812_dev_no = dev;
+
+    // create a class
+    #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 67)
+        ws2812_class = class_create(THIS_MODULE, WS2812_MODULE_NAME);
+    #else
+        ws2812_class = class_create(WS2812_MODULE_NAME);
+    #endif
+    if (IS_ERR(ws2812_class)) {
+        LOGE("> Error setting up a device class.");
+        unregister_chrdev_region(ws2812_dev_no, 1);
+        return PTR_ERR(ws2812_class);
+    }
+
+    // create a platform device
+    ws2812_device.pdev = platform_device_register_simple("ws2812-dma", -1, NULL, 0);
+    if (IS_ERR(ws2812_device.pdev)) {
+        LOGE("> Error creating a platform device.");
+        return PTR_ERR(ws2812_device.pdev);
+    }
+
+    // creeate a device
+    ws2812_device.device = device_create(ws2812_class, &ws2812_device.pdev->dev, ws2812_dev_no, NULL, WS2812_MODULE_NAME);
+    if (IS_ERR(ws2812_device.device)) {
+        LOGE("> Error creating a device.");
+        class_destroy(ws2812_class);
+        unregister_chrdev_region(ws2812_dev_no, 1);
+        return PTR_ERR(ws2812_class);
+    }
+
+    // allocate DMA buffer
+    ws2812_device.dma_buffer = dma_alloc_coherent(ws2812_device.device, 200 * sizeof(uint32_t), &ws2812_device.dma_buffer_phys, GFP_KERNEL);
+    if (ws2812_device.dma_buffer == NULL) {
+        LOGE("> No memory to allocate the DMA buffer.");
+        device_destroy(ws2812_class, ws2812_dev_no);
+        class_destroy(ws2812_class);
+        unregister_chrdev_region(ws2812_dev_no, 1);
         return -ENOMEM;
-    } else {
-        LOG("> Entry created for module at /proc/%s", WS2812_MODULE_NAME);
+    }
+
+    // populate the DMA buffer (TODO: remove this when implementing ws2812 control)
+    for (int i = 0; i < 200; i++) {
+        ws2812_device.dma_buffer[i] = (i < 100) ? i : 200 - i;
+    }
+
+    // initialize and register the char dev
+    cdev_init(&ws2812_device.cdev, &ws2812_fops);
+    ws2812_device.cdev.owner = THIS_MODULE;
+    result = cdev_add(&ws2812_device.cdev, dev, 1);
+    if (result < 0) {
+        LOGE("> Error registering the char device: %d", result);
+        dma_free_coherent(ws2812_device.device, 200 * sizeof(uint32_t), ws2812_device.dma_buffer, ws2812_device.dma_buffer_phys);
+        device_destroy(ws2812_class, ws2812_dev_no);
+        class_destroy(ws2812_class);
+        unregister_chrdev_region(ws2812_dev_no, 1);
+        return result;
     }
 
     /*****************************
@@ -286,6 +427,9 @@ static int ws2812_init(void) {
 
     LOG("> Configuring PWM.");
     pwm_configure();
+
+    LOG("> Configuring DMA.");
+    dma_configure();
 
     /*****************************
      * RETURN
@@ -309,6 +453,9 @@ static void ws2812_exit(void) {
     /*****************************
      * PRE-EXIT ACTIONS
      *****************************/
+    // deconfigure DMA
+    dma_cleanup();
+
     // turn off an LED and configure GPIO to default
     gpio_clear(WS2812_GPIO_PIN);
     gpio_configure(WS2812_GPIO_PIN, GPFSEL_INPUT);
@@ -316,17 +463,22 @@ static void ws2812_exit(void) {
     /*****************************
      * UNREGISTER MODULE
      *****************************/
-    // remove entry in procfs; proc_remove() checks input param
-    if (ws2812_proc != NULL) {
-        LOG("> Unregistering module from procfs.");
-        proc_remove(ws2812_proc);
-    } else {
-        LOGW("> Module not registered in procfs; skipping.");
-    }
+    cdev_del(&ws2812_device.cdev);
+    dma_free_coherent(ws2812_device.device, 200 * sizeof(uint32_t), ws2812_device.dma_buffer, ws2812_device.dma_buffer_phys);
+    device_destroy(ws2812_class, ws2812_dev_no);
+    class_destroy(ws2812_class);
+    unregister_chrdev_region(ws2812_dev_no, 1);
 
     /*****************************
      * DE-INITIALIZE
      *****************************/
+    // free the DMA-accessible memory for the dma_buffer
+    if (ws2812_device.dma_buffer != NULL) {
+        LOG("> Freeing DMA-accessible memory for the DMA buffer.");
+        dma_free_coherent(ws2812_device.device, 200 * sizeof(uint32_t), ws2812_device.dma_buffer, ws2812_device.dma_buffer_phys);
+        ws2812_device. dma_buffer = NULL;
+    }
+
     // unmap the CM peripheral from memory
     if (cm_registers != NULL) {
         LOG("> Unmapping CM peripheral.");
