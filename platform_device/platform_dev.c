@@ -1,5 +1,89 @@
 #include "platform_dev.h"
 
+// register configuration functions
+static int gpio_configure(unsigned int pin, gpfsel_mode_t mode) {
+    // function setup
+    volatile unsigned int *gpio_gpfseli;
+
+    // check that pins are within bounds
+    if (pin > NUM_GPIO_PINS) {
+        LOGE("Error; cannot use GPIO pin outside of [0, %d]", NUM_GPIO_PINS);
+        return -EINVAL;
+    }
+
+    // create a pointer to the selected pin's GPIO register
+    // gpfsel registers each correspond to 10 pins each, using an offset at (pin / 10)
+    gpio_gpfseli = (volatile unsigned int *)(gpio_registers + (pin / 10));
+
+    // clear the target register bits and set the mode
+    LOG("+ Configuring GPFSEL%d register.", pin / 10);
+    *gpio_gpfseli &= ~(GPIO_GPFSEL_MASK(pin));
+    *gpio_gpfseli |= (GPIO_GPFSEL(pin, mode));
+    LOG("+ GPIO_GPFSEL%d [%p]: 0x%08X", pin / 10, gpio_gpfseli, *gpio_gpfseli);
+
+    // return success
+    LOG("GPIO Configuration Complete! Enabling peripheral.");
+    return 0;
+}
+
+/**
+ * gpio_set()
+ * 
+ * Set a GPIO pin
+ */
+static int gpio_set(unsigned int pin) {
+    // function setup
+    volatile unsigned int *gpio_gpsetn;
+
+    // check that pins are within bounds
+    if (pin > NUM_GPIO_PINS) {
+        LOGE("Error; cannot use GPIO pin outside of [0, %d]", NUM_GPIO_PINS);
+        return -EINVAL;
+    }
+
+    // create a pointer to the selected pin's GPSET register
+    if (pin < 32) {
+        gpio_gpsetn = GPIO_REG(GPIO_GPSET0_OFFSET);
+    } else {
+        gpio_gpsetn = GPIO_REG(GPIO_GPSET1_OFFSET);
+    }
+
+    // write a 1 to the set bit corresponding to the pin
+    *gpio_gpsetn |= GPIO_GPSETN(pin);
+
+    // return success
+    return 0;
+}
+
+/**
+ * gpio_clear()
+ * 
+ * Clear a GPIO pin
+ */
+static int gpio_clear(unsigned int pin) {
+    // function setup
+    volatile unsigned int *gpio_gpclrn;
+
+    // check that pins are within bounds
+    if (pin > NUM_GPIO_PINS) {
+        LOGE("Error; cannot use GPIO pin outside of [0, %d]", NUM_GPIO_PINS);
+        return -EINVAL;
+    }
+
+    // create a pointer to the selected pin's GPSET register
+    if (pin < 32) {
+        gpio_gpclrn = GPIO_REG(GPIO_GPCLR0_OFFSET);
+    } else {
+        gpio_gpclrn = GPIO_REG(GPIO_GPCLR1_OFFSET);
+    }
+
+    // write a 1 to the clear bit corresponding to the pin
+    *gpio_gpclrn |= GPIO_GPCLRN(pin);
+
+    // return success
+    return 0;
+}
+
 // File operations
 static ssize_t led_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
@@ -108,6 +192,9 @@ static int __init led_init(void)
 
     pr_info("LED driver initializing\n");
 
+    gpio_configure(18, GPFSEL_OUTPUT);
+    gpio_set(18);
+
     ret = platform_driver_register(&led_platform_driver);
     if (ret)
         return ret;
@@ -126,6 +213,9 @@ static void __exit led_exit(void)
 {
     platform_device_unregister(led_platform_device);
     platform_driver_unregister(&led_platform_driver);
+
+    gpio_clear(18);
+
     pr_info("LED driver exiting\n");
 }
 
