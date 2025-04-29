@@ -1,0 +1,21 @@
+#!/bin/sh
+
+module=led
+mode="666"
+cd `dirname $0`
+set -e
+
+if grep -q '^staff:' /etc/group; then
+    group="staff"
+else
+    group="wheel"
+fi
+
+# load module
+if [ -e ${module}.ko ]; then
+    echo "Loading local built file ${module}.ko"
+    insmod ./$module.ko $* || exit 1
+else
+    echo "Local file ${module}.ko not found, attempting to modprobe"
+    modprobe ${module} || exit 1
+fi
