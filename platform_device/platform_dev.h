@@ -9,7 +9,7 @@
 #include <linux/cdev.h>                 // cdev
 #include <linux/mod_devicetable.h>      // device tables (associate module to device)
 #include <linux/device.h>               // device definitions
-#include <linux/module.h>
+#include <linux/device/class.h>
 
 // local includes
 #include "log.h"
