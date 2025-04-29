@@ -248,7 +248,7 @@ static int pwm_configure(void) {
 
     // configure the DMAC register
     LOG("+ Configuring DMAC register.");
-    *pwm_dmac |= PWM_DMAC_ENAB(1);              // enable DMA
+    *pwm_dmac &= ~(PWM_DMAC_ENAB_MASK);         // disable DMA (TODO: change after testing)
     LOG("+ PWM_DMAC [%p]: 0x%08X", pwm_dmac, *pwm_dmac);
     
     // configure the RNG1 register
