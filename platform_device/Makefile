@@ -15,9 +15,11 @@ all: modules
 
 ifneq ($(KERNELRELEASE),)
 # call from kernel build system
-obj-m := platform_dev.o
+obj-m	:= platform_dev.o
 else
 
+ARCH=arm
+CROSS_COMPILE = /home/jauy2310/Desktop/final-project-jauy2310/buildroot/output/host/bin/arm-buildroot-linux-gnueabihf-
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 PWD       := $(shell pwd)
 
