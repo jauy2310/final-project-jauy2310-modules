@@ -15,7 +15,7 @@ all: modules
 
 ifneq ($(KERNELRELEASE),)
 # call from kernel build system
-obj-m	:= platform_dev.o
+obj-m	:= led.o
 else
 
 ARCH=arm
