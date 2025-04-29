@@ -192,6 +192,15 @@ static int __init led_init(void)
 
     pr_info("LED driver initializing\n");
 
+    // remap the GPIO peripheral's physical address to a driver-usable one
+    gpio_registers = (volatile unsigned int *)ioremap(GPIO_BASE_ADDRESS, PAGE_SIZE);
+    if (gpio_registers == NULL) {
+        LOGE("> GPIO peripheral cannot be remapped.");
+        return -ENOMEM;
+    } else {
+        LOG("> GPIO peripheral mapped in memory at 0x%p.", gpio_registers);
+    }
+
     gpio_configure(18, GPFSEL_OUTPUT);
     gpio_set(18);
 
@@ -215,6 +224,12 @@ static void __exit led_exit(void)
     platform_driver_unregister(&led_platform_driver);
 
     gpio_clear(18);
+    
+    // unmap the GPIO peripheral from memory
+    if (gpio_registers != NULL) {
+        LOG("> Unmapping GPIO peripheral.");
+        iounmap(gpio_registers);
+    }
 
     pr_info("LED driver exiting\n");
 }

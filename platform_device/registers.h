@@ -12,9 +12,12 @@
 #include <stdbool.h>
 #endif
 
+#include <asm/io.h>
+
 /**************************************************************************************
  * MACROS/DEFINES
  **************************************************************************************/
+#define NUM_GPIO_PINS 53
 /**
  * CLOCK/PWM CONFIGURATION
  * 
@@ -272,5 +275,10 @@ typedef struct dma_cb_t {
     uint32_t _reserved1; // padding; don't use!
     uint32_t _reserved2; // padding; don't use!
 } dma_cb_t;
+
+/**************************************************************************************
+ * GLOBALS
+ **************************************************************************************/
+static volatile unsigned int *gpio_registers = NULL;
 
 # endif /* _REGISTERS_H_ */

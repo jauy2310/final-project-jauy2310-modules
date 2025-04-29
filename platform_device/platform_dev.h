@@ -9,7 +9,6 @@
 #include <linux/cdev.h>                 // cdev
 #include <linux/mod_devicetable.h>      // device tables (associate module to device)
 #include <linux/device.h>               // device definitions
-#include <math.h>
 
 #include <linux/miscdevice.h>
 #include <linux/uaccess.h>
