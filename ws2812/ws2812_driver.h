@@ -25,10 +25,11 @@
 #include <linux/fs.h>               // file operations
 #include <linux/cdev.h>             // character device
 #include <linux/platform_device.h>  // platform device
+#include <linux/miscdevice.h>       // misc. device interface
+#include <linux/uaccess.h>          // user/kernel memory interfacing
 
 // local includes
 #include "log.h"
-#include "led.h"
 
 /**************************************************************************************
  * MACROS/DEFINES
@@ -39,6 +40,7 @@
 // define module information
 #define WS2812_MODULE_NAME                  "ws2812"
 #define WS2812_GPIO_PIN                     18
+#define WS2812_MAX_LEDS                     100
 
 /**
  * CLOCK/PWM CONFIGURATION
@@ -299,13 +301,25 @@ typedef struct dma_cb_t {
 } dma_cb_t;
 
 /**
+ * led_t
+ * 
+ * Defines an LED struct representing a single RGB led
+ */
+typedef struct led {
+    uint8_t red;
+    uint8_t green;
+    uint8_t blue;
+} led_t;
+
+/**
  * struct ws2812_dev
  * 
  * Defines the structure of the module's device
  */
 struct ws2812_dev {
-    // linked list representation of the led strip
-    struct led_node *led_strip;
+    // array of LEDs
+    led_t leds[WS2812_MAX_LEDS];
+    int duty_cycle;
 
     // dma buffer and physical handle
     uint32_t *dma_buffer;
@@ -315,36 +329,32 @@ struct ws2812_dev {
     dma_cb_t *dma_cb;
     dma_addr_t cb_phys;
 
-    // char device
-    struct cdev cdev;
-
-    // device for DMA
-    struct device *device;
-
     // platform driver
     struct platform_device *pdev;
+    struct device *device;
 };
 
 /**************************************************************************************
  * GLOBALS
  **************************************************************************************/
-// define the registers for the GPIO peripheral
+// define the registers for peripherals
 static volatile unsigned int *gpio_registers = NULL;
 static volatile unsigned int *pwm_registers = NULL;
 static volatile unsigned int *cm_registers = NULL;
 static volatile unsigned int *dma_registers = NULL;
 
-// define DMA-related globals
-
-// define device-related globals
-int ws2812_major = 0;
-int ws2812_minor = 0;
-int ws2812_dev_no = 0;
-static struct class *ws2812_class;
-static struct ws2812_dev ws2812_device;
-
 /**************************************************************************************
  * FUNCTION PROTOTYPES
  **************************************************************************************/
+// module/driver setup
+static int ws2812_probe(struct platform_device *pdev);
+static int ws2812_remove(struct platform_device *pdev);
+
+
+// file operations
+static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
+
+// module functions
+static int pwm_setduty(int duty);
 
 # endif /* _WS2812_H_ */

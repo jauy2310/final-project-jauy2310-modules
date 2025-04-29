@@ -13,7 +13,7 @@ EXTRA_CFLAGS += $(DEBFLAGS)
 
 ifneq ($(KERNELRELEASE),)
 # call from kernel build system
-ws2812-objs := ws2812_driver.o led.o
+ws2812-objs := ws2812_driver.o
 obj-m := ws2812.o
 else
 

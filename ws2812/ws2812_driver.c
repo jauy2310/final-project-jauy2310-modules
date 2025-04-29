@@ -11,9 +11,74 @@ MODULE_AUTHOR("Jake Uyechi");
 /**************************************************************************************
  * MODULE IMPLEMENTATION
  **************************************************************************************/
-struct file_operations ws2812_fops = {
+// define a global device struct
+struct ws2812_dev ws2812_device;
+static struct platform_device *ws2812_platform_device;
+
+
+// file operations table
+static const struct file_operations ws2812_fops = {
     // file operations
+    .owner = THIS_MODULE,
+    .write = ws2812_write,
 };
+
+// misc device structure
+static struct miscdevice ws2812_misc_device = {
+    .minor = MISC_DYNAMIC_MINOR,
+    .name = WS2812_MODULE_NAME,
+    .fops = &ws2812_fops,
+};
+
+// platform device structure
+static struct platform_driver ws2812_platform_driver = {
+    .driver = {
+        .name = WS2812_MODULE_NAME,
+        .owner = THIS_MODULE,
+    },
+    .probe = ws2812_probe,
+    .remove = ws2812_remove,
+};
+
+// write function
+static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos) {
+    // function setup
+    char user_buffer[16];
+    int retval;
+
+    // check for valid parameters
+    if (count < 1 || count > 16) {
+        LOGE("- Invalid message size.");
+        return -EINVAL;
+    }
+
+    // copy from user
+    if ((retval = copy_from_user(user_buffer, buf, count))) {
+        LOGE("- Copy from userspace failed.");
+        return -EFAULT;
+    }
+
+    // null-terminate string
+    user_buffer[count] = '\0';
+
+    // convert string to integer
+    if ((retval = kstrtoint(user_buffer, 10, &ws2812_device.duty_cycle))) {
+        LOGE("- Converting string to int failed.");
+        return retval;
+    }
+    
+    // check valid input
+    if (ws2812_device.duty_cycle < 0 || ws2812_device.duty_cycle > 100) {
+        LOGE("- Invalid input; please use 0-100");
+        return -EINVAL;
+    }
+
+    // set the duty cycle of the pwm module
+    pwm_setduty(ws2812_device.duty_cycle);
+
+    // return
+    return count;
+}
 
 /**************************************************************************************
  * HELPER FUNCTIONS
@@ -207,6 +272,33 @@ static int pwm_configure(void) {
 }
 
 /**
+ * pwm_setduty()
+ * 
+ * Sets the duty cycle of the PWM module
+ */
+static int pwm_setduty(int duty) {
+    // function setup
+    volatile unsigned int *pwm_ctl = PWM_REG(PWM_CTL_OFFSET);
+    volatile unsigned int *pwm_dat1 = PWM_REG(PWM_DAT1_OFFSET);
+
+    // disable PWM for changing duty cycle
+    LOG("+ Disabling PWM to change duty cycle.");
+    *pwm_ctl &= ~(PWM_CTL_PWEN1_MASK);
+
+    // modify the duty cycle (DAT1)
+    LOG("+ Changing duty cycle to %d", duty);
+    *pwm_dat1 &= ~(PWM_DAT1_MASK);
+    *pwm_dat1 |= PWM_DAT1(duty);
+
+    // enable PWM
+    LOG("+ Duty cycle changed! Enabling PWM.");
+    *pwm_ctl &= ~(PWM_CTL_PWEN1_MASK);
+
+    // return
+    return 0;
+}
+
+/**
  * dma_configure()
  * 
  * Configure DMA peripheral using memory-mapped physical address
@@ -285,20 +377,59 @@ static void dma_cleanup(void) {
  **************************************************************************************/
 
 /**
+ * ws2812_probe()
+ * 
+ * Probes the module; main entry point
+ */
+static int ws2812_probe(struct platform_device *pdev) {
+    // function setup
+    int retval;
+
+    // log
+    LOG("> Probing WS2812 Module.");
+
+    // register misc device
+    retval = misc_register(&ws2812_misc_device);
+    if (retval) {
+        LOGE("- Error registering misc device");
+        return retval;
+    }
+
+    // success
+    return 0;
+}
+
+/**
+ * ws2812_remove()
+ * 
+ * Removes the module; main exit point
+ */
+static int ws2812_remove(struct platform_device *pdev) {
+    // log
+    LOG("> Removing WS2812 Module.");
+
+    // de-register device
+    misc_deregister(&ws2812_misc_device);
+
+    // return
+    return 0;
+}
+
+/**
  * ws2812_init()
  * 
- * Loading the module
+ * Module init function
  */
-static int ws2812_init(void) {
+static int __init ws2812_init(void) {
+
     /*****************************
      * START MODULE ENTRY
      *****************************/
     // initialization setup
-    int result = 0;
-    dev_t dev;
+    int retval = 0;
     
-    // start driver load
-    LOG("Starting WS2812B LED Kernel Module Load.");
+    // function setup
+    LOG("> Initializing WS2812 Module.");
 
     /*****************************
      * INITIALIZE
@@ -306,7 +437,7 @@ static int ws2812_init(void) {
     // remap the GPIO peripheral's physical address to a driver-usable one
     gpio_registers = (volatile unsigned int *)ioremap(GPIO_BASE_ADDRESS, PAGE_SIZE);
     if (gpio_registers == NULL) {
-        LOGE("> GPIO peripheral cannot be remapped.");
+        LOGE("- GPIO peripheral cannot be remapped.");
         return -ENOMEM;
     } else {
         LOG("> GPIO peripheral mapped in memory at 0x%p.", gpio_registers);
@@ -315,7 +446,7 @@ static int ws2812_init(void) {
     // remap the PWM peripheral's physical address to a driver-usable one
     pwm_registers = (volatile unsigned int *)ioremap(PWM_BASE_ADDRESS, PAGE_SIZE);
     if (pwm_registers == NULL) {
-        LOGE("> PWM peripheral cannot be remapped.");
+        LOGE("- PWM peripheral cannot be remapped.");
         iounmap(gpio_registers);
         return -ENOMEM;
     } else {
@@ -325,7 +456,7 @@ static int ws2812_init(void) {
     // remap the CM peripheral's physical address to a driver-usable one
     cm_registers = (volatile unsigned int *)ioremap(CM_BASE_ADDRESS, PAGE_SIZE);
     if (cm_registers == NULL) {
-        LOGE("> CM peripheral cannot be remapped.");
+        LOGE("- CM peripheral cannot be remapped.");
         iounmap(pwm_registers);
         iounmap(gpio_registers);
         return -ENOMEM;
@@ -335,7 +466,7 @@ static int ws2812_init(void) {
 
     dma_registers = (volatile unsigned int *)ioremap(DMA_CHANNEL_BASE_ADDRESS, PAGE_SIZE);
     if (dma_registers == NULL) {
-        LOGE("> DMA peripheral cannot be remapped.");
+        LOGE("- DMA peripheral cannot be remapped.");
         iounmap(cm_registers);
         iounmap(pwm_registers);
         iounmap(gpio_registers);
@@ -345,97 +476,31 @@ static int ws2812_init(void) {
     }
 
     /*****************************
-     * REGISTER MODULE
+     * DEVICE REGISTRATION
      *****************************/
-    // allocate a device
-    dev = 0;
-    result = alloc_chrdev_region(&dev, ws2812_minor, 1, WS2812_MODULE_NAME);
-    ws2812_major = MAJOR(dev);
-    if (result < 0) {
-        LOGE("> Error getting device major.");
-        return result;
-    }
-    memset(&ws2812_device, 0, sizeof(struct ws2812_dev));
-    ws2812_dev_no = dev;
-
-    // create a class
-    #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 67)
-        ws2812_class = class_create(THIS_MODULE, WS2812_MODULE_NAME);
-    #else
-        ws2812_class = class_create(WS2812_MODULE_NAME);
-    #endif
-    if (IS_ERR(ws2812_class)) {
-        LOGE("> Error setting up a device class.");
-        unregister_chrdev_region(ws2812_dev_no, 1);
-        return PTR_ERR(ws2812_class);
+    LOG("> Registering platform driver.");
+    retval = platform_driver_register(&ws2812_platform_driver);
+    if (retval) {
+        return retval;
     }
 
-    // create a platform device
-    ws2812_device.pdev = platform_device_register_simple("ws2812-dma", -1, NULL, 0);
-    if (IS_ERR(ws2812_device.pdev)) {
-        LOGE("> Error creating a platform device.");
-        return PTR_ERR(ws2812_device.pdev);
-    }
-
-    // creeate a device
-    ws2812_device.device = device_create(ws2812_class, &ws2812_device.pdev->dev, ws2812_dev_no, NULL, WS2812_MODULE_NAME);
-    if (IS_ERR(ws2812_device.device)) {
-        LOGE("> Error creating a device.");
-        class_destroy(ws2812_class);
-        unregister_chrdev_region(ws2812_dev_no, 1);
-        return PTR_ERR(ws2812_class);
-    }
-
-    // allocate DMA buffer
-    ws2812_device.dma_buffer = dma_alloc_coherent(ws2812_device.device, 200 * sizeof(uint32_t), &ws2812_device.dma_buffer_phys, GFP_KERNEL);
-    if (ws2812_device.dma_buffer == NULL) {
-        LOGE("> No memory to allocate the DMA buffer.");
-        device_destroy(ws2812_class, ws2812_dev_no);
-        class_destroy(ws2812_class);
-        unregister_chrdev_region(ws2812_dev_no, 1);
-        return -ENOMEM;
-    }
-
-    // populate the DMA buffer (TODO: remove this when implementing ws2812 control)
-    for (int i = 0; i < 200; i++) {
-        ws2812_device.dma_buffer[i] = (i < 100) ? i : 200 - i;
-    }
-
-    // initialize and register the char dev
-    cdev_init(&ws2812_device.cdev, &ws2812_fops);
-    ws2812_device.cdev.owner = THIS_MODULE;
-    result = cdev_add(&ws2812_device.cdev, dev, 1);
-    if (result < 0) {
-        LOGE("> Error registering the char device: %d", result);
-        dma_free_coherent(ws2812_device.device, 200 * sizeof(uint32_t), ws2812_device.dma_buffer, ws2812_device.dma_buffer_phys);
-        device_destroy(ws2812_class, ws2812_dev_no);
-        class_destroy(ws2812_class);
-        unregister_chrdev_region(ws2812_dev_no, 1);
-        return result;
+    // Register platform device manually (if no device tree)
+    LOG("> Registering platform device.");
+    ws2812_platform_device = platform_device_register_simple(WS2812_MODULE_NAME, -1, NULL, 0);
+    if (IS_ERR(ws2812_platform_device)) {
+        platform_driver_unregister(&ws2812_platform_driver);
+        return PTR_ERR(ws2812_platform_device);
     }
 
     /*****************************
      * POST-INIT ACTIONS
      *****************************/
-    // configure GPIO and turn on an LED
+    // configure GPIO
     LOG("> Configuring GPIO.");
-    gpio_configure(WS2812_GPIO_PIN, GPFSEL_ALT5);
-    // gpio_set(WS2812_GPIO_PIN);
-    
-    LOG("> Configuring CM.");
-    cm_configure(PWMCTL_PLLD, PWMCTL_MASH1STAGE);
+    gpio_configure(WS2812_GPIO_PIN, GPFSEL_OUTPUT);
+    gpio_set(WS2812_GPIO_PIN);
 
-    LOG("> Configuring PWM.");
-    pwm_configure();
-
-    LOG("> Configuring DMA.");
-    dma_configure();
-
-    /*****************************
-     * RETURN
-     *****************************/
-    LOG("WS2812B LED Kernel Module Loaded!");
-    return result;
+    return 0;
 }
 
 /**
@@ -443,7 +508,7 @@ static int ws2812_init(void) {
  * 
  * Unloading the module
  */
-static void ws2812_exit(void) {
+static void __exit ws2812_exit(void) {
     /*****************************
      * START MODULE EXIT
      *****************************/
@@ -463,11 +528,8 @@ static void ws2812_exit(void) {
     /*****************************
      * UNREGISTER MODULE
      *****************************/
-    cdev_del(&ws2812_device.cdev);
-    dma_free_coherent(ws2812_device.device, 200 * sizeof(uint32_t), ws2812_device.dma_buffer, ws2812_device.dma_buffer_phys);
-    device_destroy(ws2812_class, ws2812_dev_no);
-    class_destroy(ws2812_class);
-    unregister_chrdev_region(ws2812_dev_no, 1);
+    platform_device_unregister(ws2812_platform_device);
+    platform_driver_unregister(&ws2812_platform_driver);
 
     /*****************************
      * DE-INITIALIZE
