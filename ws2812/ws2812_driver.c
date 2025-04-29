@@ -254,21 +254,20 @@ static int pwm_configure(void) {
     
     // configure the RNG1 register
     LOG("+ Configuring RNG1 register.");
-    *pwm_rng1 &= ~(PWM_RNG1_MASK);
-    *pwm_rng1 |= PWM_RNG1(100);                 // set the range to 100 (percentage-based duty cycle)
+    *pwm_rng1 = PWM_RNG1(100);                  // set the range to 100 (percentage-based duty cycle)
     LOG("+ PWM_RNG1 [%p]: 0x%08X", pwm_rng1, *pwm_rng1);
     udelay(10);
 
     // configure the DAT1 register
     LOG("+ Configuring DAT1 register.");
-    *pwm_dat1 &= ~(PWM_DAT1_MASK);
-    *pwm_dat1 |= PWM_DAT1(25);                  // set the duty cycle
+    *pwm_dat1 = PWM_DAT1(25);                   // set the duty cycle
     LOG("+ PWM_DAT1 [%p]: 0x%08X", pwm_dat1, *pwm_dat1);
     udelay(10);
 
     // configuration complete; enable PWM
     LOG("+ PWM Configuration Complete! Enabling peripheral.");
     *pwm_ctl |= PWM_CTL_PWEN1(1);
+    LOG("+ PWM_CTL after enabling: 0x%08X", *pwm_ctl);
 
     // return
     return 0;
@@ -501,6 +500,9 @@ static int __init ws2812_init(void) {
     // configure GPIO
     LOG("> Configuring GPIO.");
     gpio_configure(WS2812_GPIO_PIN, GPFSEL_ALT5);
+
+    LOG("> Configuring CM.");
+    cm_configure(PWMCTL_PLLD, PWMCTL_MASH1STAGE);
 
     LOG("> Configuring PWM.");
     pwm_configure();
