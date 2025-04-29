@@ -292,7 +292,7 @@ static int pwm_setduty(int duty) {
 
     // enable PWM
     LOG("+ Duty cycle changed! Enabling PWM.");
-    *pwm_ctl &= ~(PWM_CTL_PWEN1_MASK);
+    *pwm_ctl |= PWM_CTL_PWEN1(1);
 
     // return
     return 0;
@@ -499,8 +499,10 @@ static int __init ws2812_init(void) {
     LOG("> Configuring GPIO.");
     gpio_configure(WS2812_GPIO_PIN, GPFSEL_ALT5);
 
-    LOG("> Configuring GPIO.");
+    LOG("> Configuring PWM.");
     pwm_configure();
+
+    // set gpio
     gpio_set(WS2812_GPIO_PIN);
 
     return 0;
