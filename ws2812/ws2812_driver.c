@@ -255,7 +255,7 @@ static int pwm_configure(void) {
     
     // configure the RNG1 register
     LOG("+ Configuring RNG1 register.");
-    *pwm_rng1 = PWM_RNG1(100);                  // set the range to 100 (percentage-based duty cycle)
+    *pwm_rng1 = PWM_RNG1(1000);                  // set the range to 100 (percentage-based duty cycle)
     LOG("+ PWM_RNG1 [%p]: 0x%08X", pwm_rng1, *pwm_rng1);
     udelay(DELAY_SHORT);
 
@@ -333,7 +333,7 @@ static int dma_configure(void) {
 
     // populate the DMA buffer with a breathing LED, for now
     for (int i = 0; i < BREATH_STEPS; ++i) {
-        ws2812_device.dma_buffer[i] = (uint32_t)breathing_table[i];
+        ws2812_device.dma_buffer[i] = (uint32_t)breathing_table[i] * 10;
     }
     
     // create a control block structure
