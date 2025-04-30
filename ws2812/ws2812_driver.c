@@ -318,7 +318,7 @@ static int dma_configure(void) {
 
     // allocate a DMA-accessible buffer for DMA transfers
     if (!ws2812_device.dma_buffer) {
-        LOG("+ Allocating DMA-accessible memory buffer.");
+        LOG("+ Allocating DMA-accessible memory buffer (device: %p).", ws2812_device.mdev.this_device);
         ws2812_device.dma_buffer = dma_alloc_coherent(
             ws2812_device.mdev.this_device,
             BREATH_STEPS * sizeof(uint32_t),
