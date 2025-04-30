@@ -503,9 +503,6 @@ void encode_leds_to_dma(struct ws2812_dev *dev) {
         for (int b = 23; b >= 0; b--) {
             int bit_val = (color & (1 << b)) ? PULSE_BIT_1 : PULSE_BIT_0;
             dev->dma_buffer[word_index] = bit_val;
-        
-            LOG("++ DMA[%4d] (LED %d Bit %2d): %d", word_index, i, 23 - b, bit_val == PULSE_BIT_1);
-        
             word_index++;
         }
     }
@@ -514,9 +511,6 @@ void encode_leds_to_dma(struct ws2812_dev *dev) {
     for (int b = 0; b < WS2812_RESET_LATCH_BITS; b++) {
         dev->dma_buffer[word_index++] = 0;
     }
-
-    // log the dma buffer
-    log_dma_buffer_for_all_leds(dev);
 }
 
 static void log_dma_buffer_for_all_leds(struct ws2812_dev *dev) {
@@ -598,7 +592,6 @@ static int ws2812_probe(struct platform_device *pdev) {
     // update the LED strip
     stop_dma_transfer();
     encode_leds_to_dma(&ws2812_device);
-    log_dma_buffer_for_all_leds(&ws2812_device);
     start_dma_transfer();
 
     // success
