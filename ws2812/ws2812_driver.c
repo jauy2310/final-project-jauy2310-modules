@@ -517,7 +517,7 @@ static void log_dma_buffer_for_all_leds(struct ws2812_dev *dev) {
 
     printk("=== DMA BUFFER ENCODING FOR ALL %d LEDS ===\n", dev->num_leds);
 
-    for (int led = 1; led < (dev->num_leds + 1); led++) {
+    for (int led = 0; led < dev->num_leds; led++) {
         printk("--- LED %d ---\n", led);
         for (int bit = 0; bit < 24; bit++) {
             int index = led * 24 + bit;
