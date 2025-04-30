@@ -42,6 +42,9 @@
 #define WS2812_MODULE_NAME                  "ws2812"
 #define WS2812_GPIO_PIN                     18
 #define WS2812_MAX_LEDS                     5
+#define WS2812_BITS_PER_LED                 24
+#define WS2812_RESET_LATCH_BITS             50
+#define WS2812_DMA_BUFFER_LEN               (WS2812_MAX_LEDS * WS2812_BITS_PER_LED) + WS2812_RESET_LATCH_BITS
 
 // constants
 #define PULSE_BIT_0                         33

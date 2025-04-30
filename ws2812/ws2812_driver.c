@@ -318,7 +318,7 @@ static int dma_configure(void) {
         LOG("+ Allocating DMA-accessible memory buffer (device: %p).", ws2812_device.mdev.this_device);
         ws2812_device.dma_buffer = dma_alloc_coherent(
             ws2812_device.device,
-            BREATH_STEPS * sizeof(uint32_t),
+            WS2812_DMA_BUFFER_LEN,
             &ws2812_device.dma_buffer_phys,
             GFP_KERNEL
         );
@@ -342,7 +342,7 @@ static int dma_configure(void) {
     ws2812_device.dma_cb->ti = DMA_TI_SRCINC(1) | DMA_TI_DESTDREQ(1) | DMA_TI_PERMAP(DMA_PERMAP_PWM);
     ws2812_device.dma_cb->source_ad = ws2812_device.dma_buffer_phys;
     ws2812_device.dma_cb->dest_ad = PWM_BUS_BASE_ADDRESS + PWM_FIF1_OFFSET;
-    ws2812_device.dma_cb->txfr_len = BREATH_STEPS * sizeof(uint32_t); // TODO: change this for WS2812
+    ws2812_device.dma_cb->txfr_len = WS2812_DMA_BUFFER_LEN;
     ws2812_device.dma_cb->stride = 0;
     ws2812_device.dma_cb->nextconbk = ws2812_device.cb_phys; // repeat the buffer
     LOG("+ DMA control block allocated at %p (phys: %pa)", ws2812_device.dma_cb, &ws2812_device.cb_phys);
@@ -360,6 +360,9 @@ static int dma_configure(void) {
 }
 
 static void restart_dma_transfer(void) {
+    // log
+    LOG("+ Restarting DMA transfer.");
+
     // get a reference to each of the control registers for DMA and PWM
     volatile unsigned int *dma_cs = DMA_REG(DMA_CS_OFFSET);
     volatile unsigned int *dma_conblkad = DMA_REG(DMA_CONBLKAD_OFFSET);
@@ -391,6 +394,10 @@ static void restart_dma_transfer(void) {
 
     // re-enable PWM
     *pwm_ctl |= (PWM_CTL_PWEN1(1) | PWM_CTL_USEF1(1) | PWM_CTL_MSEN1(1));
+
+    // log register state
+    LOG("+ [Post-DMA restart] DMA CS: 0x%08X", *dma_cs);
+    LOG("+ [Post-DMA restart] PWM CTL: 0x%08X", *pwm_ctl);
 }
 
 /**
@@ -427,7 +434,7 @@ static void dma_cleanup(void) {
     if (ws2812_device.dma_buffer != NULL) {
         dma_free_coherent(
             ws2812_device.device,
-            BREATH_STEPS * sizeof(uint32_t),
+            WS2812_DMA_BUFFER_LEN,
             ws2812_device.dma_buffer,
             ws2812_device.dma_buffer_phys
         );
@@ -444,6 +451,7 @@ static void dma_cleanup(void) {
  * Encodes the LEDs represented using an array of led_t into duty cycle pulses in the DMA buffer
  */
 void encode_leds_to_dma(struct ws2812_dev *dev) {
+    // get a pointer to the start of the dma buffer
     uint32_t *dma_buf = dev->dma_buffer;
 
     // process a single LED
@@ -468,6 +476,10 @@ void encode_leds_to_dma(struct ws2812_dev *dev) {
                 *dma_buf++ = PULSE_BIT_0;
             }
         }
+    }
+
+    for (int i = 0; i < WS2812_RESET_LATCH_BITS; i++) {
+        *dma_buf++ = 0;
     }
 }
 
@@ -669,7 +681,7 @@ static void __exit ws2812_exit(void) {
         LOG("> Freeing DMA-accessible memory for the DMA buffer.");
         dma_free_coherent(
             ws2812_device.device,
-            BREATH_STEPS * sizeof(uint32_t),
+            WS2812_DMA_BUFFER_LEN,
             ws2812_device.dma_buffer,
             ws2812_device.dma_buffer_phys
         );
