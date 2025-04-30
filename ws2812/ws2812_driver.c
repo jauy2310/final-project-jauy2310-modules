@@ -360,44 +360,48 @@ static int dma_configure(void) {
 }
 
 static void restart_dma_transfer(void) {
-    // log
     LOG("+ Restarting DMA transfer.");
 
-    // get a reference to each of the control registers for DMA and PWM
-    volatile unsigned int *dma_cs = DMA_REG(DMA_CS_OFFSET);
+    volatile unsigned int *dma_cs       = DMA_REG(DMA_CS_OFFSET);
     volatile unsigned int *dma_conblkad = DMA_REG(DMA_CONBLKAD_OFFSET);
-    volatile unsigned int *pwm_ctl = PWM_REG(PWM_CTL_OFFSET);
-    volatile unsigned int *pwm_dmac = PWM_REG(PWM_DMAC_OFFSET);
+    volatile unsigned int *dma_debug    = DMA_REG(DMA_DEBUG_OFFSET);
+    volatile unsigned int *pwm_ctl      = PWM_REG(PWM_CTL_OFFSET);
+    volatile unsigned int *pwm_dmac     = PWM_REG(PWM_DMAC_OFFSET);
 
-    // disable PWM
-    *pwm_ctl &= ~(PWM_CTL_PWEN1_MASK);
-
-    // clear FIFO
-    *pwm_ctl |= PWM_CTL_CLRF1(1);
-
-    // delay
+    // 1. Disable PWM and DMA
+    *pwm_ctl &= ~PWM_CTL_PWEN1_MASK;
     udelay(DELAY_SHORT);
-
-    // disable DMA
-    *dma_cs &= ~(DMA_CS_ACTIVE_MASK);
+    *dma_cs  &= ~DMA_CS_ACTIVE_MASK;
     while (*dma_cs & DMA_CS_ACTIVE(1));
 
-    // set the control block address
+    // 2. Clear DMA status flags
+    *dma_cs |= DMA_CS_END(1) | DMA_CS_INT(1);
+
+    // 3. Clear DMA debug flags
+    *dma_debug |= DMA_DEBUG_READERROR(1) | DMA_DEBUG_FIFOERROR(1) | DMA_DEBUG_RLNSE(1);
+
+    // 4. Clear PWM FIFO
+    *pwm_ctl |= PWM_CTL_CLRF1(1);
+    udelay(DELAY_SHORT);
+
+    // 5. Set control block address
     *dma_conblkad = ws2812_device.cb_phys;
 
-    // enable PWM DMA requests
-    *pwm_dmac = PWM_DMAC_ENAB(1) | (0x7 << 8) | (0x7);
+    // 6. Enable PWM DMA requests
+    *pwm_dmac = PWM_DMAC_ENAB(1) | (0x7 << 8) | (0x4);  // PANIC=7, DREQ=4
 
-    // enable DMA
+    // 7. Enable DMA first
     *dma_cs |= DMA_CS_ACTIVE(1);
     udelay(DELAY_SHORT);
 
-    // clear the FIFO and restart
+    // 8. Then enable PWM
     *pwm_ctl |= PWM_CTL_PWEN1(1);
 
-    // log register state
+    // Log final state
     LOG("+ [Post-DMA restart] DMA CS: 0x%08X", *dma_cs);
     LOG("+ [Post-DMA restart] PWM CTL: 0x%08X", *pwm_ctl);
+    LOG("+ [Post-DMA restart] PWM DMAC: 0x%08X", *pwm_dmac);
+    LOG("+ [Post-DMA restart] DMA DEBUG: 0x%08X", *dma_debug);
 }
 
 /**

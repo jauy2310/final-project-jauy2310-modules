@@ -216,6 +216,7 @@
 #define DMA_CHANNEL_BASE_ADDRESS            (DMA_BASE_ADDRESS + DMA_CHANNEL_OFFSET)
 #define DMA_CS_OFFSET                       (DMA_CHANNEL_OFFSET + 0x00000000)
 #define DMA_CONBLKAD_OFFSET                 (DMA_CHANNEL_OFFSET + 0x00000004)
+#define DMA_DEBUG_OFFSET                    (DMA_CHANNEL_OFFSET + 0x00000020)
 
 // BCM DMA CS_ACTIVE
 #define DMA_CS_ACTIVE_SHIFT                 (0)
@@ -226,6 +227,11 @@
 #define DMA_CS_END_SHIFT                    (1)
 #define DMA_CS_END_MASK                     ((0x1) << (DMA_CS_END_SHIFT))
 #define DMA_CS_END(val)                     ((DMA_CS_END_MASK) & ((val) << (DMA_CS_END_SHIFT)))
+
+// BCM DMA CS_INT
+#define DMA_CS_INT_SHIFT                    (2)
+#define DMA_CS_INT_MASK                     ((0x1) << (DMA_CS_INT_SHIFT))
+#define DMA_CS_INT(val)                     ((DMA_CS_INT_MASK) & ((val) << (DMA_CS_INT_SHIFT)))
 
 // BCM DMA CS_RESET
 #define DMA_CS_RESET_SHIFT                  (31)
@@ -251,6 +257,22 @@
 #define DMA_TI_PERMAP_SHIFT                 (16)
 #define DMA_TI_PERMAP_MASK                  ((0x1F) << (DMA_TI_PERMAP_SHIFT))
 #define DMA_TI_PERMAP(val)                  ((DMA_TI_PERMAP_MASK) & ((val) << (DMA_TI_PERMAP_SHIFT)))
+
+// BCM DMA DEBUG_RLNSE
+#define DMA_DEBUG_RLNSE_SHIFT               (0)
+#define DMA_DEBUG_RLNSE_MASK                ((0x1) << (DMA_DEBUG_RLNSE_SHIFT))
+#define DMA_DEBUG_RLNSE(val)                ((DMA_DEBUG_RLNSE_MASK) & ((val) << (DMA_DEBUG_RLNSE_SHIFT)))
+
+// BCM DMA DEBUG_FIFOERROR
+#define DMA_DEBUG_FIFOERROR_SHIFT           (1)
+#define DMA_DEBUG_FIFOERROR_MASK            ((0x1) << (DMA_DEBUG_FIFOERROR_SHIFT))
+#define DMA_DEBUG_FIFOERROR(val)            ((DMA_DEBUG_FIFOERROR_MASK) & ((val) << (DMA_DEBUG_FIFOERROR_SHIFT)))
+
+// BCM DMA DEBUG_READERROR
+#define DMA_DEBUG_READERROR_SHIFT           (2)
+#define DMA_DEBUG_READERROR_MASK            ((0x1) << (DMA_DEBUG_READERROR_SHIFT))
+#define DMA_DEBUG_READERROR(val)            ((DMA_DEBUG_READERROR_MASK) & ((val) << (DMA_DEBUG_READERROR_SHIFT)))
+
 
 /**************************************************************************************
  * TYPEDEFS
