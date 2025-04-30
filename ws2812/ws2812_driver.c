@@ -440,6 +440,22 @@ static int ws2812_probe(struct platform_device *pdev) {
         return retval;
     }
 
+    // configure GPIO
+    LOG("> Configuring GPIO.");
+    gpio_configure(WS2812_GPIO_PIN, GPFSEL_ALT5);
+
+    LOG("> Configuring CM.");
+    cm_configure(PWMCTL_PLLD, PWMCTL_MASH1STAGE);
+
+    LOG("> Configuring PWM.");
+    pwm_configure();
+
+    LOG("> Configuring DMA.");
+    dma_configure();
+
+    // set gpio
+    gpio_set(WS2812_GPIO_PIN);
+
     // success
     return 0;
 }
@@ -452,6 +468,13 @@ static int ws2812_probe(struct platform_device *pdev) {
 static int ws2812_remove(struct platform_device *pdev) {
     // log
     LOG("> Removing WS2812 Module.");
+
+    // deconfigure DMA
+    dma_cleanup();
+
+    // turn off an LED and configure GPIO to default
+    gpio_clear(WS2812_GPIO_PIN);
+    gpio_configure(WS2812_GPIO_PIN, GPFSEL_INPUT);
 
     // de-register device
     misc_deregister(&ws2812_device.mdev);
@@ -540,21 +563,6 @@ static int __init ws2812_init(void) {
     /*****************************
      * POST-INIT ACTIONS
      *****************************/
-    // configure GPIO
-    LOG("> Configuring GPIO.");
-    gpio_configure(WS2812_GPIO_PIN, GPFSEL_ALT5);
-
-    LOG("> Configuring CM.");
-    cm_configure(PWMCTL_PLLD, PWMCTL_MASH1STAGE);
-
-    LOG("> Configuring PWM.");
-    pwm_configure();
-
-    LOG("> Configuring DMA.");
-    dma_configure();
-
-    // set gpio
-    gpio_set(WS2812_GPIO_PIN);
 
     return 0;
 }
@@ -574,12 +582,6 @@ static void __exit ws2812_exit(void) {
     /*****************************
      * PRE-EXIT ACTIONS
      *****************************/
-    // deconfigure DMA
-    dma_cleanup();
-
-    // turn off an LED and configure GPIO to default
-    gpio_clear(WS2812_GPIO_PIN);
-    gpio_configure(WS2812_GPIO_PIN, GPFSEL_INPUT);
 
     /*****************************
      * UNREGISTER MODULE
