@@ -341,11 +341,11 @@ static int dma_configure(int start) {
     // fill the control block
     // DMA controller uses the bus addresses, not the virtually-mapped addresses, so dest_ad = bus address
     LOG("+ Configuring DMA control block structure.");
-    ws2812_device.dma_cb->ti = DMA_TI_SRCINC(1) | DMA_TI_DESTDREQ(1) | DMA_TI_PERMAP(DMA_PERMAP_PWM);
+    ws2812_device.dma_cb->ti        = DMA_TI_SRCINC(1) | DMA_TI_DESTDREQ(1) | DMA_TI_PERMAP(DMA_PERMAP_PWM);
     ws2812_device.dma_cb->source_ad = ws2812_device.dma_buffer_phys;
-    ws2812_device.dma_cb->dest_ad = PWM_BUS_BASE_ADDRESS + PWM_FIF1_OFFSET;
-    ws2812_device.dma_cb->txfr_len = WS2812_DMA_BUFFER_LEN * sizeof(uint32_t);
-    ws2812_device.dma_cb->stride = 0;
+    ws2812_device.dma_cb->dest_ad   = PWM_BUS_BASE_ADDRESS + PWM_FIF1_OFFSET;
+    ws2812_device.dma_cb->txfr_len  = WS2812_DMA_BUFFER_LEN * sizeof(uint32_t);
+    ws2812_device.dma_cb->stride    = 0;
     ws2812_device.dma_cb->nextconbk = 0; // TODO: test if we want to repeat or not
     LOG("+ DMA control block allocated at %p (phys: %pa)", ws2812_device.dma_cb, &ws2812_device.cb_phys);
 
@@ -369,6 +369,16 @@ static void start_dma_transfer(void) {
     volatile unsigned int *dma_conblkad = DMA_REG(DMA_CONBLKAD_OFFSET);
     volatile unsigned int *pwm_ctl      = PWM_REG(PWM_CTL_OFFSET);
     volatile unsigned int *pwm_dmac     = PWM_REG(PWM_DMAC_OFFSET);
+
+    // Re-fill the control block (REQUIRED after DMA reset)
+    ws2812_device.dma_cb->ti        = DMA_TI_SRCINC(1) | DMA_TI_DESTDREQ(1) | DMA_TI_PERMAP(DMA_PERMAP_PWM);
+    ws2812_device.dma_cb->source_ad = ws2812_device.dma_buffer_phys;
+    ws2812_device.dma_cb->dest_ad   = PWM_BUS_BASE_ADDRESS + PWM_FIF1_OFFSET;
+    ws2812_device.dma_cb->txfr_len  = WS2812_DMA_BUFFER_LEN * sizeof(uint32_t);
+    ws2812_device.dma_cb->stride    = 0;
+    ws2812_device.dma_cb->nextconbk = 0;
+
+    *dma_conblkad = ws2812_device.cb_phys;
 
     // set control block address
     *dma_conblkad = ws2812_device.cb_phys;
