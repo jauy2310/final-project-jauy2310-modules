@@ -393,7 +393,8 @@ static void restart_dma_transfer(void) {
     *dma_cs = DMA_CS_ACTIVE(1);
 
     // re-enable PWM
-    *pwm_ctl |= (PWM_CTL_PWEN1(1) | PWM_CTL_USEF1(1) | PWM_CTL_MSEN1(1));
+    *pwm_ctl |= PWM_CTL_USEF1(1) | PWM_CTL_MSEN1(1);
+    *pwm_ctl |= PWM_CTL_PWEN1(1);
 
     // log register state
     LOG("+ [Post-DMA restart] DMA CS: 0x%08X", *dma_cs);
