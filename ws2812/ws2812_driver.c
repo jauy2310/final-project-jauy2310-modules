@@ -491,23 +491,16 @@ void encode_leds_to_dma(struct ws2812_dev *dev) {
 
     // process a single LED
     for (int i = 0; i < WS2812_MAX_LEDS; i++) {
-        // if i is under the num_leds turn on
-        if (i < dev->num_leds) {
-            uint32_t color = (
-                (dev->leds[i].green << 16) | \
-                (dev->leds[i].red   << 8)  | \
-                (dev->leds[i].blue)
-            );
-            
-            for (int b = 23; b >= 0; b--) {
-                if (color & (1 << b)) {
-                    *dma_buf++ = PULSE_BIT_1;
-                } else {
-                    *dma_buf++ = PULSE_BIT_0;
-                }
-            }
-        } else {
-            for (int b = 23; b >= 0; b--) {
+        uint32_t color = (
+            (dev->leds[i].green << 16) | \
+            (dev->leds[i].red   << 8)  | \
+            (dev->leds[i].blue)
+        );
+        
+        for (int b = 23; b >= 0; b--) {
+            if (color & (1 << b)) {
+                *dma_buf++ = PULSE_BIT_1;
+            } else {
                 *dma_buf++ = PULSE_BIT_0;
             }
         }
@@ -517,7 +510,7 @@ void encode_leds_to_dma(struct ws2812_dev *dev) {
     for (int b = 0; b < WS2812_RESET_LATCH_BITS; b++) {
         *dma_buf++ = 0;
     }
-    
+
     // debug
     int total_words = dma_buf - dev->dma_buffer;
     LOG("+ Total DMA words encoded: %d", total_words);
