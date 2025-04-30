@@ -73,7 +73,7 @@ static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t co
     log_dma_buffer_for_all_leds(dev);
 
     // encode LED array to DMA buffer
-    encode_leds_to_dma(&ws2812_device);
+    encode_leds_to_dma(dev);
 
     // start DMA transfer
     restart_dma_transfer();
@@ -507,7 +507,7 @@ static void log_dma_buffer_for_all_leds(struct ws2812_dev *dev) {
 
     printk("=== DMA BUFFER ENCODING FOR ALL %d LEDS ===\n", dev->num_leds);
 
-    for (int led = 0; led < dev->num_leds; led++) {
+    for (int led = 1; led < (dev->num_leds + 1); led++) {
         printk("--- LED %d ---\n", led);
         for (int bit = 0; bit < 24; bit++) {
             int index = led * 24 + bit;
