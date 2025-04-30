@@ -43,9 +43,6 @@ static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t co
     char color_str[8] = {0};
     uint8_t red, green, blue;
 
-    struct ws2812_dev *dev = file->private_data;
-    dev->num_leds = WS2812_MAX_LEDS;
-
     if (count < 7) {
         return -EINVAL;
     }
@@ -67,14 +64,14 @@ static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t co
 
     // set all LEDs to same color
     for (int i = 0; i < WS2812_MAX_LEDS; i++) {
-        dev->leds[i].red = red;
-        dev->leds[i].green = green;
-        dev->leds[i].blue = blue;
+        ws2812_device.leds[i].red = red;
+        ws2812_device.leds[i].green = green;
+        ws2812_device.leds[i].blue = blue;
     }
 
     // encode LED array to DMA buffer
-    encode_leds_to_dma(dev);
-    log_dma_buffer_for_all_leds(dev);
+    encode_leds_to_dma(ws2812_device);
+    log_dma_buffer_for_all_leds(ws2812_device);
 
     return count;
 }
