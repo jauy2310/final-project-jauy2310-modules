@@ -41,7 +41,11 @@
 // define module information
 #define WS2812_MODULE_NAME                  "ws2812"
 #define WS2812_GPIO_PIN                     18
-#define WS2812_MAX_LEDS                     100
+#define WS2812_MAX_LEDS                     5
+
+// constants
+#define PULSE_BIT_0                         33
+#define PULSE_BIT_1                         67
 #define DELAY_SHORT                         10
 
 // test defines
@@ -135,6 +139,10 @@
 #define PWM_CTL_USEF1_SHIFT                 (5)
 #define PWM_CTL_USEF1_MASK                  ((0x1) << (PWM_CTL_USEF1_SHIFT))
 #define PWM_CTL_USEF1(val)                  ((PWM_CTL_USEF1_MASK) & ((val) << (PWM_CTL_USEF1_SHIFT)))
+
+#define PWM_CTL_CLRF1_SHIFT                 (6)
+#define PWM_CTL_CLRF1_MASK                  ((0x1) << (PWM_CTL_CLRF1_SHIFT))
+#define PWM_CTL_CLRF1(val)                  ((PWM_CTL_CLRF1_MASK) & ((val) << (PWM_CTL_CLRF1_SHIFT)))
 
 #define PWM_CTL_MSEN1_SHIFT                 (7)
 #define PWM_CTL_MSEN1_MASK                  ((0x1) << (PWM_CTL_MSEN1_SHIFT))
@@ -325,6 +333,7 @@ typedef struct led {
 struct ws2812_dev {
     // array of LEDs
     led_t leds[WS2812_MAX_LEDS];
+    int num_leds;
     int duty_cycle;
 
     // dma buffer and physical handle
@@ -389,5 +398,7 @@ static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t co
 
 // module functions
 static int pwm_setduty(int duty);
+static void restart_dma_transfer(void);
+void encode_leds_to_dma(struct ws2812_dev *dev);
 
 # endif /* _WS2812_H_ */

@@ -40,44 +40,41 @@ static int ws2812_open(struct inode *inode, struct file *file) {
 
 // write function
 static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos) {
-    // function setup
-    char user_buffer[16];
-    int retval;
+    char color_str[8] = {0};
+    uint8_t red, green, blue;
 
-    // get device struct
-    struct ws2812_dev *dev = file->private_data;
-
-    // check for valid parameters
-    if (count < 1 || count > 16) {
-        LOGE("- Invalid message size.");
+    if (count < 7) {
         return -EINVAL;
     }
 
-    // copy from user
-    if ((retval = copy_from_user(user_buffer, buf, count))) {
-        LOGE("- Copy from userspace failed.");
+    if (copy_from_user(color_str, buf, 7)) {
         return -EFAULT;
     }
 
-    // null-terminate string
-    user_buffer[count] = '\0';
-
-    // convert string to integer
-    if ((retval = kstrtoint(user_buffer, 10, &dev->duty_cycle))) {
-        LOGE("- Converting string to int failed.");
-        return retval;
-    }
-    
-    // check valid input
-    if (dev->duty_cycle < 0 || dev->duty_cycle > 100) {
-        LOGE("- Invalid input; please use 0-100");
+    if (color_str[0] != '#') {
         return -EINVAL;
     }
 
-    // set the duty cycle of the pwm module
-    pwm_setduty(dev->duty_cycle);
+    // parse hex RGB values
+    if (sscanf(color_str + 1, "%02hhx%02hhx%02hhx", &red, &green, &blue) != 3) {
+        return -EINVAL;
+    }
 
-    // return
+    LOG("Set LED strip to #%02X%02X%02X", red, green, blue);
+
+    // set all LEDs to same color
+    for (int i = 0; i < WS2812_MAX_LEDS; i++) {
+        ws2812_device.leds[i].red   = red;
+        ws2812_device.leds[i].green = green;
+        ws2812_device.leds[i].blue  = blue;
+    }
+
+    // encode LED array to DMA buffer
+    encode_leds_to_dma(&ws2812_device);
+
+    // start DMA transfer
+    restart_dma_transfer();
+
     return count;
 }
 
@@ -243,7 +240,7 @@ static int pwm_configure(void) {
     // configure the CTL register
     LOG("+ Configuring CTL register.");
     *pwm_ctl &= ~(PWM_CTL_MODE1_MASK);          // set to PWM mode
-    *pwm_ctl &= ~(PWM_CTL_SBIT1_MASK);          // pull LOW between transfers (TODO: change after testing)
+    *pwm_ctl &= ~(PWM_CTL_SBIT1_MASK);          // pull LOW between transfers
     *pwm_ctl |= PWM_CTL_USEF1(1);               // enable FIFO
     *pwm_ctl |= PWM_CTL_MSEN1(1);               // enable Mark-Space (M/S) mode
     LOG("+ PWM_CTL [%p]: 0x%08X", pwm_ctl, *pwm_ctl);
@@ -330,11 +327,6 @@ static int dma_configure(void) {
             return -ENOMEM;
         }
     }
-
-    // populate the DMA buffer with a breathing LED, for now
-    for (int i = 0; i < BREATH_STEPS; ++i) {
-        ws2812_device.dma_buffer[i] = (uint32_t)breathing_table[i];
-    }
     
     // create a control block structure
     LOG("+ Allocating DMA-accessible control block.");
@@ -365,6 +357,40 @@ static int dma_configure(void) {
 
     // return 
     return 0;
+}
+
+static void restart_dma_transfer(void) {
+    // get a reference to each of the control registers for DMA and PWM
+    volatile unsigned int *dma_cs = DMA_REG(DMA_CS_OFFSET);
+    volatile unsigned int *dma_conblkad = DMA_REG(DMA_CONBLKAD_OFFSET);
+    volatile unsigned int *pwm_ctl = PWM_REG(PWM_CTL_OFFSET);
+    volatile unsigned int *pwm_dmac = PWM_REG(PWM_DMAC_OFFSET);
+
+    // stop the DMA channel
+    *dma_cs = DMA_CS_RESET(1);
+    udelay(DELAY_SHORT);
+
+    // disable PWM temporarily
+    *pwm_ctl &= ~(PWM_CTL_PWEN1_MASK);
+    udelay(DELAY_SHORT);
+
+    // clear the FIFO
+    *pwm_ctl |= PWM_CTL_CLRF1(1);
+    udelay(DELAY_SHORT);
+
+    // stop pwm dmac
+    *pwm_dmac &= ~(PWM_DMAC_ENAB_MASK);
+    udelay(DELAY_SHORT);
+    *pwm_dmac |= PWM_DMAC_ENAB(1);
+
+    // set up the control block pointer again
+    *dma_conblkad = ws2812_device.cb_phys;
+
+    // re-enable DMA
+    *dma_cs = DMA_CS_ACTIVE(1);
+
+    // re-enable PWM
+    *pwm_ctl |= (PWM_CTL_PWEN1(1) | PWM_CTL_USEF1(1) | PWM_CTL_MSEN1(1));
 }
 
 /**
@@ -412,6 +438,39 @@ static void dma_cleanup(void) {
     LOG("DMA deconfiguration complete.");
 }
 
+/**
+ * encode_leds_to_dma()
+ * 
+ * Encodes the LEDs represented using an array of led_t into duty cycle pulses in the DMA buffer
+ */
+void encode_leds_to_dma(struct ws2812_dev *dev) {
+    uint32_t *dma_buf = dev->dma_buffer;
+
+    // process a single LED
+    for (int i = 0; i < WS2812_MAX_LEDS; i++) {
+        // if i is under the num_leds turn on
+        if (i < dev->num_leds) {
+            uint32_t color = (
+                (dev->leds[i].green << 16) | \
+                (dev->leds[i].red   << 8)  | \
+                (dev->leds[i].blue)
+            );
+            
+            for (int b = 23; b >= 0; b--) {
+                if (color & (1 << b)) {
+                    *dma_buf++ = PULSE_BIT_1;
+                } else {
+                    *dma_buf++ = PULSE_BIT_0;
+                }
+            }
+        } else {
+            for (int b = 23; b >= 0; b--) {
+                *dma_buf++ = PULSE_BIT_0;
+            }
+        }
+    }
+}
+
 /**************************************************************************************
  * MODULE LOAD/UNLOAD FUNCTIONS
  **************************************************************************************/
@@ -443,13 +502,12 @@ static int ws2812_probe(struct platform_device *pdev) {
         return retval;
     }
 
-    // configure GPIO
+    // configure peripherals
     LOG("> Configuring GPIO.");
     gpio_configure(WS2812_GPIO_PIN, GPFSEL_ALT5);
 
     LOG("> Configuring CM.");
-    cm_configure(PWMCTL_OSC, PWMDIV_REGISTER_BREATHE, PWMCTL_MASH1STAGE); // TODO: change clock source and div for ws2812
-    // cm_configure(PWMCTL_PLLD, PWMDIV_REGISTER, PWMCTL_MASH1STAGE);
+    cm_configure(PWMCTL_PLLD, PWMDIV_REGISTER, PWMCTL_MASH1STAGE);
 
     LOG("> Configuring PWM.");
     pwm_configure();
@@ -457,8 +515,9 @@ static int ws2812_probe(struct platform_device *pdev) {
     LOG("> Configuring DMA.");
     dma_configure();
 
-    // set gpio
-    gpio_set(WS2812_GPIO_PIN);
+    // peripherals configured; turn on led strip
+    encode_leds_to_dma(&ws2812_device);
+    restart_dma_transfer();
 
     // success
     return 0;
@@ -567,6 +626,15 @@ static int __init ws2812_init(void) {
     /*****************************
      * POST-INIT ACTIONS
      *****************************/
+    // pre-populate the LED buf with some LEDs
+    for (int i = 0; i < WS2812_MAX_LEDS; i++) {
+        ws2812_device.leds[i].red = 0xFF;
+        ws2812_device.leds[i].green = 0x00;
+        ws2812_device.leds[i].blue = 0x00;
+    }
+
+    // set the max leds
+    ws2812_device.num_leds = WS2812_MAX_LEDS;
 
     return 0;
 }
