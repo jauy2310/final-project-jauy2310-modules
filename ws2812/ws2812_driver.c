@@ -383,7 +383,6 @@ static void restart_dma_transfer(void) {
 
     // stop pwm dmac
     *pwm_dmac &= ~(PWM_DMAC_ENAB_MASK);
-    udelay(DELAY_SHORT);
     *pwm_dmac |= PWM_DMAC_ENAB(1);
 
     // set up the control block pointer again
