@@ -369,32 +369,29 @@ static void restart_dma_transfer(void) {
     volatile unsigned int *pwm_ctl = PWM_REG(PWM_CTL_OFFSET);
     volatile unsigned int *pwm_dmac = PWM_REG(PWM_DMAC_OFFSET);
 
-    // stop the DMA channel
-    *dma_cs = DMA_CS_RESET(1);
-    udelay(DELAY_SHORT);
-
-    // disable PWM temporarily
+    // disable PWM
     *pwm_ctl &= ~(PWM_CTL_PWEN1_MASK);
-    udelay(DELAY_SHORT);
 
-    // clear the FIFO
+    // clear FIFO
     *pwm_ctl |= PWM_CTL_CLRF1(1);
+
+    // delay
     udelay(DELAY_SHORT);
 
-    // stop pwm dmac
-    *pwm_dmac &= ~(PWM_DMAC_ENAB_MASK);
-    *pwm_dmac |= PWM_DMAC_ENAB(1);
+    // disable DMA
+    *dma_cs &= ~(DMA_CS_ACTIVE_MASK);
+    while (*dma_cs & DMA_CS_ACTIVE(1));
 
-    // set up the control block pointer again
+    // set the control block address
     *dma_conblkad = ws2812_device.cb_phys;
 
-    // re-enable DMA
-    *dma_cs = DMA_CS_ACTIVE(1);
-    udelay(DELAY_LONG);
-
-    // re-enable PWM
-    *pwm_ctl |= PWM_CTL_USEF1(1) | PWM_CTL_MSEN1(1);
+    // clear the FIFO and restart
+    *pwm_ctl |= PWM_CTL_CLRF1(1);
+    udelay(DELAY_SHORT);
     *pwm_ctl |= PWM_CTL_PWEN1(1);
+
+    // enable DMA
+    *dma_cs |= DMA_CS_ACTIVE(1);
 
     // log register state
     LOG("+ [Post-DMA restart] DMA CS: 0x%08X", *dma_cs);
