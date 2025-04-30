@@ -320,7 +320,7 @@ static int dma_configure(void) {
     if (!ws2812_device.dma_buffer) {
         LOG("+ Allocating DMA-accessible memory buffer (device: %p).", ws2812_device.mdev.this_device);
         ws2812_device.dma_buffer = dma_alloc_coherent(
-            ws2812_device.mdev.this_device,
+            ws2812_device.device,
             BREATH_STEPS * sizeof(uint32_t),
             &ws2812_device.dma_buffer_phys,
             GFP_KERNEL
@@ -338,7 +338,7 @@ static int dma_configure(void) {
     
     // create a control block structure
     LOG("+ Allocating DMA-accessible control block.");
-    ws2812_device.dma_cb = dma_alloc_coherent(ws2812_device.mdev.this_device, sizeof(dma_cb_t), &ws2812_device.cb_phys, GFP_KERNEL);
+    ws2812_device.dma_cb = dma_alloc_coherent(ws2812_device.device, sizeof(dma_cb_t), &ws2812_device.cb_phys, GFP_KERNEL);
     if (!ws2812_device.dma_cb) {
         LOGE("- Error allocating memory for DMA handle.");
         return -ENOMEM;
@@ -388,7 +388,7 @@ static void dma_cleanup(void) {
     // free any allocated DMA resources if necessary
     if (ws2812_device.dma_cb != NULL) {
         dma_free_coherent(
-            ws2812_device.mdev.this_device,
+            ws2812_device.device,
             sizeof(dma_cb_t),
             ws2812_device.dma_cb,
             ws2812_device.cb_phys
@@ -400,7 +400,7 @@ static void dma_cleanup(void) {
     // free DMA buffer
     if (ws2812_device.dma_buffer != NULL) {
         dma_free_coherent(
-            ws2812_device.mdev.this_device,
+            ws2812_device.device,
             BREATH_STEPS * sizeof(uint32_t),
             ws2812_device.dma_buffer,
             ws2812_device.dma_buffer_phys
@@ -427,6 +427,9 @@ static int ws2812_probe(struct platform_device *pdev) {
 
     // log
     LOG("> Probing WS2812 Module.");
+
+    // store reference to device in the overarching device struct
+    ws2812_device.device = &pdev->dev;
 
     // initialize the misc device
     ws2812_device.mdev.minor = MISC_DYNAMIC_MINOR;
@@ -596,7 +599,7 @@ static void __exit ws2812_exit(void) {
     if (ws2812_device.dma_buffer != NULL) {
         LOG("> Freeing DMA-accessible memory for the DMA buffer.");
         dma_free_coherent(
-            ws2812_device.mdev.this_device,
+            ws2812_device.device,
             BREATH_STEPS * sizeof(uint32_t),
             ws2812_device.dma_buffer,
             ws2812_device.dma_buffer_phys

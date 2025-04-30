@@ -336,6 +336,9 @@ struct ws2812_dev {
 
     // misc device
     struct miscdevice mdev;
+
+    // device
+    struct device *device;
 };
 
 /**************************************************************************************
