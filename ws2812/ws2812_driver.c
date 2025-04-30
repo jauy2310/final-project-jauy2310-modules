@@ -385,13 +385,15 @@ static void restart_dma_transfer(void) {
     // set the control block address
     *dma_conblkad = ws2812_device.cb_phys;
 
-    // clear the FIFO and restart
-    *pwm_ctl |= PWM_CTL_CLRF1(1);
-    udelay(DELAY_SHORT);
-    *pwm_ctl |= PWM_CTL_PWEN1(1);
+    // enable PWM DMA requests
+    *pwm_dmac = PWM_DMAC_ENAB(1) | (0x7 << 8) | (0x7);
 
     // enable DMA
     *dma_cs |= DMA_CS_ACTIVE(1);
+    udelay(DELAY_SHORT);
+
+    // clear the FIFO and restart
+    *pwm_ctl |= PWM_CTL_PWEN1(1);
 
     // log register state
     LOG("+ [Post-DMA restart] DMA CS: 0x%08X", *dma_cs);
