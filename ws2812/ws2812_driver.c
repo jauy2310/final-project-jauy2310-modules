@@ -391,11 +391,11 @@ static void restart_dma_transfer(void) {
 
     // re-enable DMA
     *dma_cs = DMA_CS_ACTIVE(1);
+    udelay(DELAY_LONG);
 
     // re-enable PWM
     *pwm_ctl |= PWM_CTL_USEF1(1) | PWM_CTL_MSEN1(1);
     *pwm_ctl |= PWM_CTL_PWEN1(1);
-    udelay(DELAY_LONG);
 
     // log register state
     LOG("+ [Post-DMA restart] DMA CS: 0x%08X", *dma_cs);
