@@ -74,7 +74,6 @@ static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t co
     // encode LED array to DMA buffer
     stop_dma_transfer();
     encode_leds_to_dma(dev);
-    log_dma_buffer_for_all_leds(dev);
     start_dma_transfer();
 
     return count;
@@ -490,6 +489,10 @@ void encode_leds_to_dma(struct ws2812_dev *dev) {
     uint32_t *dma_buf = dev->dma_buffer;
     memset(dma_buf, 0, WS2812_DMA_BUFFER_LEN * sizeof(uint32_t));
 
+    // debug
+    int total_words = dma_buf - dev->dma_buffer;
+    LOG("Total DMA words encoded: %d", total_words);
+
     // process a single LED
     for (int i = 0; i < WS2812_MAX_LEDS; i++) {
         // if i is under the num_leds turn on
@@ -514,9 +517,13 @@ void encode_leds_to_dma(struct ws2812_dev *dev) {
         }
     }
 
+    // write latching bits
     for (int b = 0; b < WS2812_RESET_LATCH_BITS; b++) {
         *dma_buf++ = 0;
     }
+
+    // log the dma buffer
+    log_dma_buffer_for_all_leds(dev);
 }
 
 static void log_dma_buffer_for_all_leds(struct ws2812_dev *dev) {
