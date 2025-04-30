@@ -11,12 +11,16 @@ endif
 
 EXTRA_CFLAGS += $(DEBFLAGS)
 
+all: modules
+
 ifneq ($(KERNELRELEASE),)
 # call from kernel build system
-ws2812-objs := ws2812_driver.o led.o
+ws2812-objs := ws2812_driver.o
 obj-m := ws2812.o
 else
 
+ARCH=arm
+CROSS_COMPILE = /home/jauy2310/Desktop/final-project-jauy2310/buildroot/output/host/bin/arm-buildroot-linux-gnueabihf-
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 PWD       := $(shell pwd)
 

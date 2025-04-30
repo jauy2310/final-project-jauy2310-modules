@@ -25,10 +25,12 @@
 #include <linux/fs.h>               // file operations
 #include <linux/cdev.h>             // character device
 #include <linux/platform_device.h>  // platform device
+#include <linux/miscdevice.h>       // misc. device interface
+#include <linux/uaccess.h>          // user/kernel memory interfacing
+#include <linux/delay.h>            // delays
 
 // local includes
 #include "log.h"
-#include "led.h"
 
 /**************************************************************************************
  * MACROS/DEFINES
@@ -39,6 +41,11 @@
 // define module information
 #define WS2812_MODULE_NAME                  "ws2812"
 #define WS2812_GPIO_PIN                     18
+#define WS2812_MAX_LEDS                     100
+#define DELAY_SHORT                         10
+
+// test defines
+#define BREATH_STEPS                        200
 
 /**
  * CLOCK/PWM CONFIGURATION
@@ -61,6 +68,7 @@
  * 6. OR'ing these together gives the register's set value (0x00006400)
  */
 #define PWMDIV_REGISTER                     (0x00006400)
+#define PWMDIV_REGISTER_BREATHE             (0x00180000)
 
 // BCM base address in physical memory
 #define PHY_BASE_ADDRESS                    (0x3F000000)
@@ -299,13 +307,25 @@ typedef struct dma_cb_t {
 } dma_cb_t;
 
 /**
+ * led_t
+ * 
+ * Defines an LED struct representing a single RGB led
+ */
+typedef struct led {
+    uint8_t red;
+    uint8_t green;
+    uint8_t blue;
+} led_t;
+
+/**
  * struct ws2812_dev
  * 
  * Defines the structure of the module's device
  */
 struct ws2812_dev {
-    // linked list representation of the led strip
-    struct led_node *led_strip;
+    // array of LEDs
+    led_t leds[WS2812_MAX_LEDS];
+    int duty_cycle;
 
     // dma buffer and physical handle
     uint32_t *dma_buffer;
@@ -315,36 +335,59 @@ struct ws2812_dev {
     dma_cb_t *dma_cb;
     dma_addr_t cb_phys;
 
-    // char device
-    struct cdev cdev;
+    // misc device
+    struct miscdevice mdev;
 
-    // device for DMA
+    // device
     struct device *device;
-
-    // platform driver
-    struct platform_device *pdev;
 };
 
 /**************************************************************************************
  * GLOBALS
  **************************************************************************************/
-// define the registers for the GPIO peripheral
+// define the registers for peripherals
 static volatile unsigned int *gpio_registers = NULL;
 static volatile unsigned int *pwm_registers = NULL;
 static volatile unsigned int *cm_registers = NULL;
 static volatile unsigned int *dma_registers = NULL;
 
-// define DMA-related globals
-
-// define device-related globals
-int ws2812_major = 0;
-int ws2812_minor = 0;
-int ws2812_dev_no = 0;
-static struct class *ws2812_class;
-static struct ws2812_dev ws2812_device;
+// for breathing animation; pre-computed table for a sine wave
+static const uint8_t breathing_table[200] = {
+    0,  0,  0,  0,  0,  0,  0,  1,  1,  1,
+    2,  2,  3,  4,  4,  5,  6,  6,  7,  8,
+    9, 10, 11, 12, 13, 14, 15, 16, 18, 19,
+   20, 21, 23, 24, 25, 27, 28, 30, 31, 33,
+   34, 36, 37, 39, 40, 42, 43, 45, 46, 48,
+   49, 51, 53, 54, 56, 57, 59, 60, 62, 63,
+   65, 66, 68, 69, 71, 72, 74, 75, 76, 78,
+   79, 80, 81, 83, 84, 85, 86, 87, 88, 89,
+   90, 91, 92, 93, 93, 94, 95, 95, 96, 97,
+   97, 98, 98, 98, 99, 99, 99, 99, 99, 99,
+  100, 99, 99, 99, 99, 99, 99, 98, 98, 98,
+   97, 97, 96, 95, 95, 94, 93, 93, 92, 91,
+   90, 89, 88, 87, 86, 85, 84, 83, 81, 80,
+   79, 78, 76, 75, 74, 72, 71, 69, 68, 66,
+   65, 63, 62, 60, 59, 57, 56, 54, 53, 51,
+   49, 48, 46, 45, 43, 42, 40, 39, 37, 36,
+   34, 33, 31, 30, 28, 27, 25, 24, 23, 21,
+   20, 19, 18, 16, 15, 14, 13, 12, 11, 10,
+    9,  8,  7,  6,  6,  5,  4,  4,  3,  2,
+    2,  1,  1,  1,  0,  0,  0,  0,  0,  0
+  };
 
 /**************************************************************************************
  * FUNCTION PROTOTYPES
  **************************************************************************************/
+// module/driver setup
+static int ws2812_probe(struct platform_device *pdev);
+static int ws2812_remove(struct platform_device *pdev);
+
+
+// file operations
+static int ws2812_open(struct inode *inode, struct file *file);
+static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
+
+// module functions
+static int pwm_setduty(int duty);
 
 # endif /* _WS2812_H_ */
