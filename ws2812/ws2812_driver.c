@@ -498,11 +498,15 @@ void encode_leds_to_dma(struct ws2812_dev *dev) {
             (dev->leds[i].red << 8)   |
             (dev->leds[i].blue)
         );
-        LOG("++ LED[%d]: #%06X", i, color);
 
         // add bits to the buffer
         for (int b = 23; b >= 0; b--) {
-            dev->dma_buffer[word_index++] = (color & (1 << b)) ? PULSE_BIT_1 : PULSE_BIT_0;
+            int bit_val = (color & (1 << b)) ? PULSE_BIT_1 : PULSE_BIT_0;
+            dev->dma_buffer[word_index] = bit_val;
+        
+            LOG("++ DMA[%4d] (LED %d Bit %2d): %d", word_index, i, 23 - b, bit_val == PULSE_BIT_1);
+        
+            word_index++;
         }
     }
 
