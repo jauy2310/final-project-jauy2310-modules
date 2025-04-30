@@ -494,11 +494,11 @@ void encode_leds_to_dma(struct ws2812_dev *dev) {
     // add leds to buffer
     for (int i = 0; i < dev->num_leds; i++) {
         uint32_t color = (
-            (dev->leds[i].green) |
-            (dev->leds[i].red)   |
+            (dev->leds[i].green << 16) |
+            (dev->leds[i].red << 8)   |
             (dev->leds[i].blue)
         );
-        LOG("++ LED[%d]: #%u", i, color);
+        LOG("++ LED[%d]: #%06X", i, color);
 
         // add bits to the buffer
         for (int b = 23; b >= 0; b--) {
