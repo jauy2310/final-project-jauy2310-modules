@@ -409,6 +409,29 @@ static void restart_dma_transfer(void) {
 }
 
 /**
+ * stop_dma_and_pwm()
+ * 
+ * Stops the DMA and PWM so we can write to the buffer
+ */
+static void stop_dma_and_pwm(void) {
+    volatile unsigned int *dma_cs    = DMA_REG(DMA_CS_OFFSET);
+    volatile unsigned int *pwm_ctl   = PWM_REG(PWM_CTL_OFFSET);
+    volatile unsigned int *dma_debug = DMA_REG(DMA_DEBUG_OFFSET);
+
+    *pwm_ctl &= ~PWM_CTL_PWEN1_MASK;
+    udelay(DELAY_SHORT);
+
+    *dma_cs &= ~DMA_CS_ACTIVE_MASK;
+    while (*dma_cs & DMA_CS_ACTIVE(1));
+
+    *dma_cs |= DMA_CS_END(1) | DMA_CS_INT(1);
+    *dma_debug |= DMA_DEBUG_READERROR(1) | DMA_DEBUG_FIFOERROR(1) | DMA_DEBUG_RLNSE(1);
+
+    *pwm_ctl |= PWM_CTL_CLRF1(1);
+    udelay(DELAY_SHORT);
+}
+
+/**
  * dma_cleanup()
  * 
  * Deconfigures the DMA
@@ -462,6 +485,9 @@ void encode_leds_to_dma(struct ws2812_dev *dev) {
     // log
     LOG("+ Encoding LEDs to DMA buffer (SIZE: %d).", WS2812_DMA_BUFFER_LEN);
 
+    // stop the pwm/dma transfer
+    stop_dma_and_pwm();
+
     // get a pointer to the start of the dma buffer
     uint32_t *dma_buf = dev->dma_buffer;
     memset(dma_buf, 0, WS2812_DMA_BUFFER_LEN);
@@ -498,6 +524,9 @@ void encode_leds_to_dma(struct ws2812_dev *dev) {
     for (int b = 0; b < WS2812_RESET_LATCH_BITS; b++) {
         *dma_buf++ = 0;
     }
+
+    // restart the dma transfer
+    restart_dma_transfer();
 }
 
 static void log_dma_buffer_for_all_leds(struct ws2812_dev *dev) {
@@ -583,7 +612,6 @@ static int ws2812_probe(struct platform_device *pdev) {
     }
     encode_leds_to_dma(&ws2812_device);
     log_dma_buffer_for_all_leds(&ws2812_device);
-    restart_dma_transfer();
 
     // success
     return 0;
