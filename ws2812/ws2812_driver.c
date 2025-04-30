@@ -43,6 +43,8 @@ static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t co
     char color_str[8] = {0};
     uint8_t red, green, blue;
 
+    struct ws2812_dev *dev = file->private_data;
+
     if (count < 7) {
         return -EINVAL;
     }
@@ -64,15 +66,15 @@ static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t co
 
     // set all LEDs to same color
     for (int i = 0; i < WS2812_MAX_LEDS; i++) {
-        ws2812_device.leds[i].red = red;
-        ws2812_device.leds[i].green = green;
-        ws2812_device.leds[i].blue = blue;
+        dev->leds[i].red = red;
+        dev->leds[i].green = green;
+        dev->leds[i].blue = blue;
     }
 
     // encode LED array to DMA buffer
     stop_dma_transfer();
-    encode_leds_to_dma(&ws2812_device);
-    log_dma_buffer_for_all_leds(&ws2812_device);
+    encode_leds_to_dma(dev);
+    log_dma_buffer_for_all_leds(dev);
     start_dma_transfer();
 
     return count;
@@ -391,23 +393,31 @@ static void start_dma_transfer(void) {
  * Stops the DMA and PWM so we can write to the buffer
  */
 static void stop_dma_transfer(void) {
+    LOG("+ Stopping DMA transfer.");
+
+    // get memory-mapped registers
     volatile unsigned int *dma_cs    = DMA_REG(DMA_CS_OFFSET);
     volatile unsigned int *pwm_ctl   = PWM_REG(PWM_CTL_OFFSET);
     volatile unsigned int *dma_debug = DMA_REG(DMA_DEBUG_OFFSET);
 
+    // disable PWM
     *pwm_ctl &= ~PWM_CTL_PWEN1_MASK;
     udelay(DELAY_SHORT);
 
+    // disable DMA
     *dma_cs &= ~DMA_CS_ACTIVE_MASK;
     while (*dma_cs & DMA_CS_ACTIVE(1));
     udelay(DELAY_SHORT);
 
+    // reset DMA
     *dma_cs |= DMA_CS_RESET(1);
     udelay(DELAY_LONG);
 
+    // clear DMA flags
     *dma_cs |= DMA_CS_END(1) | DMA_CS_INT(1);
     *dma_debug |= DMA_DEBUG_READERROR(1) | DMA_DEBUG_FIFOERROR(1) | DMA_DEBUG_RLNSE(1);
 
+    // clear the PWM FIFO
     *pwm_ctl |= PWM_CTL_CLRF1(1);
     udelay(DELAY_SHORT);
 }
