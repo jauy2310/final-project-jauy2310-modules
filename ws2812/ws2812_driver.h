@@ -411,5 +411,6 @@ static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t co
 static int pwm_setduty(int duty);
 static void restart_dma_transfer(void);
 void encode_leds_to_dma(struct ws2812_dev *dev);
+static void log_dma_buffer_for_all_leds(struct ws2812_dev *dev);
 
 # endif /* _WS2812_H_ */

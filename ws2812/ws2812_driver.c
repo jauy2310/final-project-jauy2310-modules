@@ -487,6 +487,28 @@ void encode_leds_to_dma(struct ws2812_dev *dev) {
     }
 }
 
+static void log_dma_buffer_for_all_leds(struct ws2812_dev *dev) {
+    if (!dev->dma_buffer) {
+        LOGE("DMA buffer is NULL.");
+        return;
+    }
+
+    printk("=== DMA BUFFER ENCODING FOR ALL %d LEDS ===\n", dev->num_leds);
+
+    for (int led = 0; led < dev->num_leds; led++) {
+        printk("--- LED %d ---\n", led);
+        for (int bit = 0; bit < 24; bit++) {
+            int index = led * 24 + bit;
+            uint32_t val = dev->dma_buffer[index];
+            const char *bit_type = (val == PULSE_BIT_1) ? "1" :
+                                   (val == PULSE_BIT_0) ? "0" : "INVALID";
+            printk("Bit %3d: %3u [%s]\n", index, val, bit_type);
+        }
+    }
+
+    printk("===========================================\n");
+}
+
 /**************************************************************************************
  * MODULE LOAD/UNLOAD FUNCTIONS
  **************************************************************************************/
@@ -547,6 +569,7 @@ static int ws2812_probe(struct platform_device *pdev) {
         ws2812_device.leds[i].blue  = test_colors[i][2];
     }
     encode_leds_to_dma(&ws2812_device);
+    log_dma_buffer_for_all_leds(&ws2812_device);
     restart_dma_transfer();
 
     // success
