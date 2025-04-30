@@ -303,7 +303,7 @@ static int pwm_setduty(int duty) {
  * 
  * Configure DMA peripheral using memory-mapped physical address
  */
-static int dma_configure(void) {
+static int dma_configure(int start) {
     // function setup
     volatile unsigned int *dma_cs = DMA_REG(DMA_CS_OFFSET);
     volatile unsigned int *dma_conblkad = DMA_REG(DMA_CONBLKAD_OFFSET);
@@ -353,7 +353,7 @@ static int dma_configure(void) {
 
     // enable DMA channel
     LOG("+ DMA Configuration Complete! Enabling peripheral.");
-    *dma_cs |= DMA_CS_ACTIVE(1);
+    *dma_cs |= DMA_CS_ACTIVE(start);
 
     // return 
     return 0;
@@ -568,7 +568,7 @@ static int ws2812_probe(struct platform_device *pdev) {
     pwm_configure();
 
     LOG("> Configuring DMA.");
-    dma_configure();
+    dma_configure(0); // don't start yet; let's populate the buffer first
 
     // peripherals configured; turn on led strip
 
