@@ -486,8 +486,8 @@ void encode_leds_to_dma(struct ws2812_dev *dev) {
     LOG("+ Encoding LEDs to DMA buffer (SIZE: %d).", WS2812_DMA_BUFFER_LEN);
     
     // get a pointer to the start of the dma buffer
+    memset(dev->dma_buffer, 0, WS2812_DMA_BUFFER_LEN * sizeof(uint32_t));
     uint32_t *dma_buf = dev->dma_buffer;
-    memset(dma_buf, 0, WS2812_DMA_BUFFER_LEN * sizeof(uint32_t));
 
     // process a single LED
     for (int i = 0; i < WS2812_MAX_LEDS; i++) {
