@@ -68,6 +68,7 @@
  * 6. OR'ing these together gives the register's set value (0x00006400)
  */
 #define PWMDIV_REGISTER                     (0x00006400)
+#define PWMDIV_REGISTER_BREATHE             (0x00F00000)
 
 // BCM base address in physical memory
 #define PHY_BASE_ADDRESS                    (0x3F000000)

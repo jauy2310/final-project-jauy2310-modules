@@ -178,7 +178,7 @@ static int gpio_clear(unsigned int pin) {
  * 
  * Configure the clock manager peripheral
  */
-static int cm_configure(pwmctl_src_t src, pwmctl_mash_t mash) {         
+static int cm_configure(pwmctl_src_t src, uint32_t div, pwmctl_mash_t mash) {         
     // function setup
     int timeout;
     volatile unsigned int *cm_pwmctl = CM_REG(CM_PWMCTL_OFFSET);
@@ -198,7 +198,7 @@ static int cm_configure(pwmctl_src_t src, pwmctl_mash_t mash) {
 
     // configure the clock divider
     LOG("+ Configuring the clock divider.");
-    *cm_pwmdiv = (CM_PASSWD) | (*cm_pwmdiv & ~CM_PWMDIV_MASK) | (CM_PWMDIV(PWMDIV_REGISTER));
+    *cm_pwmdiv = (CM_PASSWD) | (*cm_pwmdiv & ~CM_PWMDIV_MASK) | (CM_PWMDIV(div));
     LOG("+ CM_PWMDIV [%p]: 0x%08X", cm_pwmdiv, *cm_pwmdiv);
 
     // configure the clock source and MASH
@@ -448,7 +448,8 @@ static int ws2812_probe(struct platform_device *pdev) {
     gpio_configure(WS2812_GPIO_PIN, GPFSEL_ALT5);
 
     LOG("> Configuring CM.");
-    cm_configure(PWMCTL_PLLD, PWMCTL_MASH1STAGE);
+    cm_configure(PWMCTL_OSC, PWMDIV_REGISTER_BREATHE, PWMCTL_MASH1STAGE); // TODO: change clock source and div for ws2812
+    // cm_configure(PWMCTL_PLLD, PWMDIV_REGISTER, PWMCTL_MASH1STAGE);
 
     LOG("> Configuring PWM.");
     pwm_configure();
