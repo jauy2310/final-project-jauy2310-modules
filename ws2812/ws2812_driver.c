@@ -344,7 +344,7 @@ static int dma_configure(void) {
     ws2812_device.dma_cb->dest_ad = PWM_BUS_BASE_ADDRESS + PWM_FIF1_OFFSET;
     ws2812_device.dma_cb->txfr_len = WS2812_DMA_BUFFER_LEN;
     ws2812_device.dma_cb->stride = 0;
-    ws2812_device.dma_cb->nextconbk = ws2812_device.cb_phys; // repeat the buffer
+    ws2812_device.dma_cb->nextconbk = 0; // TODO: test if we want to repeat or not
     LOG("+ DMA control block allocated at %p (phys: %pa)", ws2812_device.dma_cb, &ws2812_device.cb_phys);
 
     // set the control block address
@@ -451,6 +451,9 @@ static void dma_cleanup(void) {
  * Encodes the LEDs represented using an array of led_t into duty cycle pulses in the DMA buffer
  */
 void encode_leds_to_dma(struct ws2812_dev *dev) {
+    // log
+    LOG("+ Encoding LEDs to DMA buffer.");
+
     // get a pointer to the start of the dma buffer
     uint32_t *dma_buf = dev->dma_buffer;
 
@@ -528,6 +531,15 @@ static int ws2812_probe(struct platform_device *pdev) {
     dma_configure();
 
     // peripherals configured; turn on led strip
+    // pre-populate the LED buf with some LEDs
+    for (int i = 0; i < WS2812_MAX_LEDS; i++) {
+        ws2812_device.leds[i].red = 0xFF;
+        ws2812_device.leds[i].green = 0x00;
+        ws2812_device.leds[i].blue = 0x00;
+    }
+
+    // set the max leds
+    ws2812_device.num_leds = WS2812_MAX_LEDS;
     encode_leds_to_dma(&ws2812_device);
     restart_dma_transfer();
 
@@ -638,15 +650,6 @@ static int __init ws2812_init(void) {
     /*****************************
      * POST-INIT ACTIONS
      *****************************/
-    // pre-populate the LED buf with some LEDs
-    for (int i = 0; i < WS2812_MAX_LEDS; i++) {
-        ws2812_device.leds[i].red = 0xFF;
-        ws2812_device.leds[i].green = 0x00;
-        ws2812_device.leds[i].blue = 0x00;
-    }
-
-    // set the max leds
-    ws2812_device.num_leds = WS2812_MAX_LEDS;
 
     return 0;
 }
