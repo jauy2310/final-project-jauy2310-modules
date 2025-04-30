@@ -480,11 +480,6 @@ void encode_leds_to_dma(struct ws2812_dev *dev) {
     uint32_t *dma_buf = dev->dma_buffer;
     memset(dma_buf, 0, WS2812_DMA_BUFFER_LEN * sizeof(uint32_t));
 
-    // create a dummy led
-    for (int b = 0; b < WS2812_DUMMY_LED_BITS; b++) {
-        *dma_buf++ = PULSE_BIT_0;
-    }
-
     // process a single LED
     for (int i = 0; i < WS2812_MAX_LEDS; i++) {
         // if i is under the num_leds turn on
