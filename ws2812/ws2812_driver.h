@@ -50,6 +50,7 @@
 #define PULSE_BIT_0                         33
 #define PULSE_BIT_1                         67
 #define DELAY_SHORT                         10
+#define DELAY_LONG                          100
 
 // test defines
 #define BREATH_STEPS                        200
@@ -74,7 +75,7 @@
  * 
  * 6. OR'ing these together gives the register's set value (0x00006400)
  */
-#define PWMDIV_REGISTER                     (0x00006400)
+#define PWMDIV_REGISTER                     (0x00006500)
 #define PWMDIV_REGISTER_BREATHE             (0x00180000)
 
 // BCM base address in physical memory
