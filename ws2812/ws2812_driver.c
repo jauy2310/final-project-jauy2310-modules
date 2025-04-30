@@ -70,7 +70,7 @@ static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t co
         dev->leds[i].green = green;
         dev->leds[i].blue = blue;
     }
-    log_dma_buffer_for_all_leds(&dev);
+    log_dma_buffer_for_all_leds(dev);
 
     // encode LED array to DMA buffer
     encode_leds_to_dma(&ws2812_device);
