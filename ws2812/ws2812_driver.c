@@ -15,22 +15,6 @@ MODULE_AUTHOR("Jake Uyechi");
 struct ws2812_dev ws2812_device;
 static struct platform_device *ws2812_platform_device;
 
-
-// file operations table
-static const struct file_operations ws2812_fops = {
-    // file operations
-    .owner = THIS_MODULE,
-    .write = ws2812_write,
-};
-
-// misc device structure
-static struct miscdevice ws2812_misc_device = {
-    .minor = MISC_DYNAMIC_MINOR,
-    .name = WS2812_MODULE_NAME,
-    .fops = &ws2812_fops,
-};
-
-// platform device structure
 static struct platform_driver ws2812_platform_driver = {
     .driver = {
         .name = WS2812_MODULE_NAME,
@@ -40,11 +24,28 @@ static struct platform_driver ws2812_platform_driver = {
     .remove = ws2812_remove,
 };
 
+// file operations table
+static const struct file_operations ws2812_fops = {
+    // file operations
+    .owner = THIS_MODULE,
+    .open = ws2812_open,
+    .write = ws2812_write,
+};
+
+// open function
+static int ws2812_open(struct inode *inode, struct file *file) {
+    file->private_data = &ws2812_device;
+    return 0;
+}
+
 // write function
 static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos) {
     // function setup
     char user_buffer[16];
     int retval;
+
+    // get device struct
+    struct ws2812_dev *dev = file->private_data;
 
     // check for valid parameters
     if (count < 1 || count > 16) {
@@ -62,19 +63,19 @@ static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t co
     user_buffer[count] = '\0';
 
     // convert string to integer
-    if ((retval = kstrtoint(user_buffer, 10, &ws2812_device.duty_cycle))) {
+    if ((retval = kstrtoint(user_buffer, 10, &dev->duty_cycle))) {
         LOGE("- Converting string to int failed.");
         return retval;
     }
     
     // check valid input
-    if (ws2812_device.duty_cycle < 0 || ws2812_device.duty_cycle > 100) {
+    if (dev->duty_cycle < 0 || dev->duty_cycle > 100) {
         LOGE("- Invalid input; please use 0-100");
         return -EINVAL;
     }
 
     // set the duty cycle of the pwm module
-    pwm_setduty(ws2812_device.duty_cycle);
+    pwm_setduty(dev->duty_cycle);
 
     // return
     return count;
@@ -237,32 +238,32 @@ static int pwm_configure(void) {
     // disable PWM for configuration
     LOG("+ Disabling PWM for configuration.");
     *pwm_ctl &= ~(PWM_CTL_PWEN1_MASK);
-    udelay(10);
+    udelay(DELAY_SHORT);
 
     // configure the CTL register
     LOG("+ Configuring CTL register.");
     *pwm_ctl &= ~(PWM_CTL_MODE1_MASK);          // set to PWM mode
     *pwm_ctl &= ~(PWM_CTL_SBIT1_MASK);          // pull LOW between transfers (TODO: change after testing)
-    *pwm_ctl |= PWM_CTL_USEF1(0);               // disable FIFO (TODO: change after testing)
+    *pwm_ctl |= PWM_CTL_USEF1(1);               // enable FIFO
     *pwm_ctl |= PWM_CTL_MSEN1(1);               // enable Mark-Space (M/S) mode
     LOG("+ PWM_CTL [%p]: 0x%08X", pwm_ctl, *pwm_ctl);
 
     // configure the DMAC register
     LOG("+ Configuring DMAC register.");
-    *pwm_dmac &= ~(PWM_DMAC_ENAB_MASK);         // disable DMA (TODO: change after testing)
+    *pwm_dmac |= PWM_DMAC_ENAB(1);         // enable DMA
     LOG("+ PWM_DMAC [%p]: 0x%08X", pwm_dmac, *pwm_dmac);
     
     // configure the RNG1 register
     LOG("+ Configuring RNG1 register.");
     *pwm_rng1 = PWM_RNG1(100);                  // set the range to 100 (percentage-based duty cycle)
     LOG("+ PWM_RNG1 [%p]: 0x%08X", pwm_rng1, *pwm_rng1);
-    udelay(10);
+    udelay(DELAY_SHORT);
 
     // configure the DAT1 register
     LOG("+ Configuring DAT1 register.");
     *pwm_dat1 = PWM_DAT1(25);                   // set the duty cycle
     LOG("+ PWM_DAT1 [%p]: 0x%08X", pwm_dat1, *pwm_dat1);
-    udelay(10);
+    udelay(DELAY_SHORT);
 
     // configuration complete; enable PWM
     LOG("+ PWM Configuration Complete! Enabling peripheral.");
@@ -313,11 +314,32 @@ static int dma_configure(void) {
     // disable DMA channel
     LOG("+ Disabling DMA for configuration.");
     *dma_cs &= ~(DMA_CS_ACTIVE_MASK);
+    udelay(DELAY_SHORT);
+
+    // allocate a DMA-accessible buffer for DMA transfers
+    if (!ws2812_device.dma_buffer) {
+        LOG("+ Allocating DMA-accessible memory buffer.");
+        ws2812_device.dma_buffer = dma_alloc_coherent(
+            ws2812_device.mdev.this_device,
+            BREATH_STEPS * sizeof(uint32_t),
+            &ws2812_device.dma_buffer_phys,
+            GFP_KERNEL
+        );
+        if (!ws2812_device.dma_buffer) {
+            LOGE("- Failed to allocate DMA buffer.");
+            return -ENOMEM;
+        }
+    }
+
+    // populate the DMA buffer with a breathing LED, for now
+    for (int i = 0; i < BREATH_STEPS; ++i) {
+        ws2812_device.dma_buffer[i] = (uint32_t)breathing_table[i];
+    }
     
     // create a control block structure
     LOG("+ Allocating DMA-accessible control block.");
-    ws2812_device.dma_cb = dma_alloc_coherent(ws2812_device.device, sizeof(dma_cb_t), &ws2812_device.cb_phys, GFP_KERNEL);
-    if (ws2812_device.dma_cb == NULL) {
+    ws2812_device.dma_cb = dma_alloc_coherent(ws2812_device.mdev.this_device, sizeof(dma_cb_t), &ws2812_device.cb_phys, GFP_KERNEL);
+    if (!ws2812_device.dma_cb) {
         LOGE("- Error allocating memory for DMA handle.");
         return -ENOMEM;
     }
@@ -328,7 +350,7 @@ static int dma_configure(void) {
     ws2812_device.dma_cb->ti = DMA_TI_SRCINC(1) | DMA_TI_DESTDREQ(1) | DMA_TI_PERMAP(DMA_PERMAP_PWM);
     ws2812_device.dma_cb->source_ad = ws2812_device.dma_buffer_phys;
     ws2812_device.dma_cb->dest_ad = PWM_BUS_BASE_ADDRESS + PWM_FIF1_OFFSET;
-    ws2812_device.dma_cb->txfr_len = 200; // TODO: change this to the length of the LED buffer; adding/removing leds require this to update
+    ws2812_device.dma_cb->txfr_len = BREATH_STEPS * sizeof(uint32_t); // TODO: change this for WS2812
     ws2812_device.dma_cb->stride = 0;
     ws2812_device.dma_cb->nextconbk = ws2812_device.cb_phys; // repeat the buffer
     LOG("+ DMA control block allocated at %p (phys: %pa)", ws2812_device.dma_cb, &ws2812_device.cb_phys);
@@ -365,9 +387,25 @@ static void dma_cleanup(void) {
 
     // free any allocated DMA resources if necessary
     if (ws2812_device.dma_cb != NULL) {
-        dma_free_coherent(NULL, sizeof(dma_cb_t), ws2812_device.dma_cb, ws2812_device.cb_phys);  // Free the control block
+        dma_free_coherent(
+            ws2812_device.mdev.this_device,
+            sizeof(dma_cb_t),
+            ws2812_device.dma_cb,
+            ws2812_device.cb_phys
+        );
         ws2812_device.dma_cb = NULL;
         ws2812_device.cb_phys = 0;
+    }
+
+    // free DMA buffer
+    if (ws2812_device.dma_buffer != NULL) {
+        dma_free_coherent(
+            ws2812_device.mdev.this_device,
+            BREATH_STEPS * sizeof(uint32_t),
+            ws2812_device.dma_buffer,
+            ws2812_device.dma_buffer_phys
+        );
+        ws2812_device.dma_buffer = NULL;
     }
 
     // dma cleaned up
@@ -390,8 +428,13 @@ static int ws2812_probe(struct platform_device *pdev) {
     // log
     LOG("> Probing WS2812 Module.");
 
+    // initialize the misc device
+    ws2812_device.mdev.minor = MISC_DYNAMIC_MINOR;
+    ws2812_device.mdev.name = WS2812_MODULE_NAME;
+    ws2812_device.mdev.fops = &ws2812_fops;
+
     // register misc device
-    retval = misc_register(&ws2812_misc_device);
+    retval = misc_register(&ws2812_device.mdev);
     if (retval) {
         LOGE("- Error registering misc device");
         return retval;
@@ -411,7 +454,7 @@ static int ws2812_remove(struct platform_device *pdev) {
     LOG("> Removing WS2812 Module.");
 
     // de-register device
-    misc_deregister(&ws2812_misc_device);
+    misc_deregister(&ws2812_device.mdev);
 
     // return
     return 0;
@@ -507,6 +550,9 @@ static int __init ws2812_init(void) {
     LOG("> Configuring PWM.");
     pwm_configure();
 
+    LOG("> Configuring DMA.");
+    dma_configure();
+
     // set gpio
     gpio_set(WS2812_GPIO_PIN);
 
@@ -547,7 +593,12 @@ static void __exit ws2812_exit(void) {
     // free the DMA-accessible memory for the dma_buffer
     if (ws2812_device.dma_buffer != NULL) {
         LOG("> Freeing DMA-accessible memory for the DMA buffer.");
-        dma_free_coherent(ws2812_device.device, 200 * sizeof(uint32_t), ws2812_device.dma_buffer, ws2812_device.dma_buffer_phys);
+        dma_free_coherent(
+            ws2812_device.mdev.this_device,
+            BREATH_STEPS * sizeof(uint32_t),
+            ws2812_device.dma_buffer,
+            ws2812_device.dma_buffer_phys
+        );
         ws2812_device. dma_buffer = NULL;
     }
 
