@@ -70,7 +70,7 @@ static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t co
     }
 
     // encode LED array to DMA buffer
-    stop_dma_and_pwm();
+    stop_dma_transfer();
     encode_leds_to_dma(&ws2812_device);
     log_dma_buffer_for_all_leds(&ws2812_device);
     start_dma_transfer();
@@ -386,7 +386,7 @@ static void start_dma_transfer(void) {
 }
 
 /**
- * stop_dma_and_pwm()
+ * stop_dma_transfer()
  * 
  * Stops the DMA and PWM so we can write to the buffer
  */
