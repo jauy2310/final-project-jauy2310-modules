@@ -41,7 +41,7 @@
 // define module information
 #define WS2812_MODULE_NAME                  "ws2812"
 #define WS2812_GPIO_PIN                     18
-#define WS2812_MAX_LEDS                     5
+#define WS2812_MAX_LEDS                     6
 #define WS2812_BITS_PER_LED                 24
 #define WS2812_DUMMY_LED_BITS               24
 #define WS2812_RESET_LATCH_BITS             4000
@@ -411,12 +411,13 @@ static const uint8_t breathing_table[200] = {
     2,  1,  1,  1,  0,  0,  0,  0,  0,  0
   };
 
-  uint8_t test_colors[5][3] = {
+  uint8_t test_colors[6][3] = {
     {0xFF, 0x00, 0x00},  // Red
     {0x00, 0xFF, 0x00},  // Green
     {0x00, 0x00, 0xFF},  // Blue
     {0xFF, 0xFF, 0x00},  // Yellow
     {0xFF, 0x00, 0xFF},  // Magenta
+    {0x00, 0xFF, 0xFF},  // Cyan
 };
 
 /**************************************************************************************
