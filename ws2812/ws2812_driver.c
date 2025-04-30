@@ -602,7 +602,7 @@ static int ws2812_probe(struct platform_device *pdev) {
 
     // set the max leds
     ws2812_device.num_leds = WS2812_MAX_LEDS;
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 6; i++) {
         ws2812_device.leds[i].green = test_colors[i][1];
         ws2812_device.leds[i].red   = test_colors[i][0];
         ws2812_device.leds[i].blue  = test_colors[i][2];
