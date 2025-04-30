@@ -318,7 +318,7 @@ static int dma_configure(void) {
         LOG("+ Allocating DMA-accessible memory buffer (device: %p).", ws2812_device.mdev.this_device);
         ws2812_device.dma_buffer = dma_alloc_coherent(
             ws2812_device.device,
-            WS2812_DMA_BUFFER_LEN,
+            WS2812_DMA_BUFFER_LEN * sizeof(uint32_t),
             &ws2812_device.dma_buffer_phys,
             GFP_KERNEL
         );
@@ -342,7 +342,7 @@ static int dma_configure(void) {
     ws2812_device.dma_cb->ti = DMA_TI_SRCINC(1) | DMA_TI_DESTDREQ(1) | DMA_TI_PERMAP(DMA_PERMAP_PWM);
     ws2812_device.dma_cb->source_ad = ws2812_device.dma_buffer_phys;
     ws2812_device.dma_cb->dest_ad = PWM_BUS_BASE_ADDRESS + PWM_FIF1_OFFSET;
-    ws2812_device.dma_cb->txfr_len = WS2812_DMA_BUFFER_LEN;
+    ws2812_device.dma_cb->txfr_len = WS2812_DMA_BUFFER_LEN * sizeof(uint32_t);
     ws2812_device.dma_cb->stride = 0;
     ws2812_device.dma_cb->nextconbk = 0; // TODO: test if we want to repeat or not
     LOG("+ DMA control block allocated at %p (phys: %pa)", ws2812_device.dma_cb, &ws2812_device.cb_phys);
@@ -434,7 +434,7 @@ static void dma_cleanup(void) {
     if (ws2812_device.dma_buffer != NULL) {
         dma_free_coherent(
             ws2812_device.device,
-            WS2812_DMA_BUFFER_LEN,
+            WS2812_DMA_BUFFER_LEN * sizeof(uint32_t),
             ws2812_device.dma_buffer,
             ws2812_device.dma_buffer_phys
         );
@@ -542,6 +542,7 @@ static int ws2812_probe(struct platform_device *pdev) {
     ws2812_device.num_leds = WS2812_MAX_LEDS;
     encode_leds_to_dma(&ws2812_device);
     restart_dma_transfer();
+    udelay(DELAY_SHORT);
 
     // success
     return 0;
@@ -684,7 +685,7 @@ static void __exit ws2812_exit(void) {
         LOG("> Freeing DMA-accessible memory for the DMA buffer.");
         dma_free_coherent(
             ws2812_device.device,
-            WS2812_DMA_BUFFER_LEN,
+            WS2812_DMA_BUFFER_LEN * sizeof(uint32_t),
             ws2812_device.dma_buffer,
             ws2812_device.dma_buffer_phys
         );
