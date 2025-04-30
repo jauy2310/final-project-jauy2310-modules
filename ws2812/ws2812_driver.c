@@ -76,9 +76,6 @@ static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t co
     encode_leds_to_dma(dev);
     log_dma_buffer_for_all_leds(dev);
 
-    // start DMA transfer
-    restart_dma_transfer();
-
     return count;
 }
 
