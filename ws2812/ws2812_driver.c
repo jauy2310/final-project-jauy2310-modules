@@ -41,7 +41,7 @@ static int ws2812_open(struct inode *inode, struct file *file) {
 // write function
 static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos) {
     char color_str[8] = {0};
-    uint8_t red, green, blue;
+    unsigned char red, green, blue;
 
     struct ws2812_dev *dev = file->private_data;
 
@@ -62,13 +62,13 @@ static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t co
         return -EINVAL;
     }
 
-    LOG("Set LED strip to #%02X%02X%02X", red, green, blue);
+    LOG("Set LED strip to #%02X%02X%02X", (int)red, (int)green, (int)blue);
 
     // set all LEDs to same color
     for (int i = 0; i < WS2812_MAX_LEDS; i++) {
-        dev->leds[i].red = red;
-        dev->leds[i].green = green;
-        dev->leds[i].blue = blue;
+        dev->leds[i].red = (uint8_t)red;
+        dev->leds[i].green = (uint8_t)green;
+        dev->leds[i].blue = (uint8_t)blue;
     }
 
     // encode LED array to DMA buffer
