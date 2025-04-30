@@ -487,33 +487,29 @@ void encode_leds_to_dma(struct ws2812_dev *dev) {
     
     // get a pointer to the start of the dma buffer
     memset(dev->dma_buffer, 0, WS2812_DMA_BUFFER_LEN * sizeof(uint32_t));
-    uint32_t *dma_buf = dev->dma_buffer;
 
-    // process a single LED
-    for (int i = 0; i < WS2812_MAX_LEDS; i++) {
+    // set a pointer for the index in the dma buffer
+    int word_index = 0;
+
+    // add leds to buffer
+    for (int i = 0; i < dev->num_leds; i++) {
         uint32_t color = (
-            (dev->leds[i].green << 16) | \
-            (dev->leds[i].red   << 8)  | \
+            (dev->leds[i].green) |
+            (dev->leds[i].red)   |
             (dev->leds[i].blue)
         );
-        
+        LOG("++ LED[%d]: #%u", i, color);
+
+        // add bits to the buffer
         for (int b = 23; b >= 0; b--) {
-            if (color & (1 << b)) {
-                *dma_buf++ = PULSE_BIT_1;
-            } else {
-                *dma_buf++ = PULSE_BIT_0;
-            }
+            dev->dma_buffer[word_index++] = (color & (1 << b)) ? PULSE_BIT_1 : PULSE_BIT_0;
         }
     }
 
     // write latching bits
     for (int b = 0; b < WS2812_RESET_LATCH_BITS; b++) {
-        *dma_buf++ = 0;
+        dev->dma_buffer[word_index++] = 0;
     }
-
-    // debug
-    int total_words = dma_buf - dev->dma_buffer;
-    LOG("+ Total DMA words encoded: %d", total_words);
 
     // log the dma buffer
     log_dma_buffer_for_all_leds(dev);
