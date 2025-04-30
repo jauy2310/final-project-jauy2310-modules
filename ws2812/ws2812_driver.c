@@ -571,12 +571,6 @@ static int ws2812_probe(struct platform_device *pdev) {
     dma_configure();
 
     // peripherals configured; turn on led strip
-    // pre-populate the LED buf with some LEDs
-    for (int i = 0; i < WS2812_MAX_LEDS; i++) {
-        ws2812_device.leds[i].red = 0xFF;
-        ws2812_device.leds[i].green = 0x00;
-        ws2812_device.leds[i].blue = 0x00;
-    }
 
     // set the max leds
     ws2812_device.num_leds = WS2812_MAX_LEDS;
