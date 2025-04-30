@@ -44,6 +44,7 @@ static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t co
     uint8_t red, green, blue;
 
     struct ws2812_dev *dev = file->private_data;
+    dev->num_leds = WS2812_MAX_LEDS;
 
     if (count < 7) {
         return -EINVAL;
