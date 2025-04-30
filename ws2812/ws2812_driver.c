@@ -543,7 +543,6 @@ static int ws2812_probe(struct platform_device *pdev) {
     ws2812_device.num_leds = WS2812_MAX_LEDS;
     encode_leds_to_dma(&ws2812_device);
     restart_dma_transfer();
-    udelay(DELAY_SHORT);
 
     // success
     return 0;
