@@ -70,8 +70,10 @@ static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t co
     }
 
     // encode LED array to DMA buffer
+    stop_dma_and_pwm();
     encode_leds_to_dma(&ws2812_device);
     log_dma_buffer_for_all_leds(&ws2812_device);
+    start_dma_transfer();
 
     return count;
 }
@@ -357,49 +359,30 @@ static int dma_configure(void) {
     return 0;
 }
 
-static void restart_dma_transfer(void) {
+static void start_dma_transfer(void) {
     LOG("+ Restarting DMA transfer.");
 
+    // get memory-mapped registers
     volatile unsigned int *dma_cs       = DMA_REG(DMA_CS_OFFSET);
     volatile unsigned int *dma_conblkad = DMA_REG(DMA_CONBLKAD_OFFSET);
-    volatile unsigned int *dma_debug    = DMA_REG(DMA_DEBUG_OFFSET);
     volatile unsigned int *pwm_ctl      = PWM_REG(PWM_CTL_OFFSET);
     volatile unsigned int *pwm_dmac     = PWM_REG(PWM_DMAC_OFFSET);
 
-    // 1. Disable PWM and DMA
-    *pwm_ctl &= ~PWM_CTL_PWEN1_MASK;
-    udelay(DELAY_SHORT);
-    *dma_cs  &= ~DMA_CS_ACTIVE_MASK;
-    while (*dma_cs & DMA_CS_ACTIVE(1));
-
-    // 2. Clear DMA status flags
-    *dma_cs |= DMA_CS_END(1) | DMA_CS_INT(1);
-
-    // 3. Clear DMA debug flags
-    *dma_debug |= DMA_DEBUG_READERROR(1) | DMA_DEBUG_FIFOERROR(1) | DMA_DEBUG_RLNSE(1);
-
-    // 4. Clear PWM FIFO
-    *pwm_ctl |= PWM_CTL_CLRF1(1);
-    udelay(DELAY_SHORT);
-
-    // 5. Set control block address
+    // set control block address
     *dma_conblkad = ws2812_device.cb_phys;
 
-    // 6. Enable PWM DMA requests
+    // enable PWM DMA requests
     *pwm_dmac = PWM_DMAC_ENAB(1) | (0x7 << 8) | (0x4);  // PANIC=7, DREQ=4
 
-    // 7. Enable DMA first
+    // enable DMA first, then PWM
     *dma_cs |= DMA_CS_ACTIVE(1);
     udelay(DELAY_SHORT);
-
-    // 8. Then enable PWM
     *pwm_ctl |= PWM_CTL_PWEN1(1);
 
     // Log final state
     LOG("+ [Post-DMA restart] DMA CS: 0x%08X", *dma_cs);
     LOG("+ [Post-DMA restart] PWM CTL: 0x%08X", *pwm_ctl);
     LOG("+ [Post-DMA restart] PWM DMAC: 0x%08X", *pwm_dmac);
-    LOG("+ [Post-DMA restart] DMA DEBUG: 0x%08X", *dma_debug);
 }
 
 /**
@@ -407,7 +390,7 @@ static void restart_dma_transfer(void) {
  * 
  * Stops the DMA and PWM so we can write to the buffer
  */
-static void stop_dma_and_pwm(void) {
+static void stop_dma_transfer(void) {
     volatile unsigned int *dma_cs    = DMA_REG(DMA_CS_OFFSET);
     volatile unsigned int *pwm_ctl   = PWM_REG(PWM_CTL_OFFSET);
     volatile unsigned int *dma_debug = DMA_REG(DMA_DEBUG_OFFSET);
@@ -417,6 +400,10 @@ static void stop_dma_and_pwm(void) {
 
     *dma_cs &= ~DMA_CS_ACTIVE_MASK;
     while (*dma_cs & DMA_CS_ACTIVE(1));
+    udelay(DELAY_SHORT);
+
+    *dma_cs |= DMA_CS_RESET(1);
+    udelay(DELAY_LONG);
 
     *dma_cs |= DMA_CS_END(1) | DMA_CS_INT(1);
     *dma_debug |= DMA_DEBUG_READERROR(1) | DMA_DEBUG_FIFOERROR(1) | DMA_DEBUG_RLNSE(1);
@@ -478,10 +465,7 @@ static void dma_cleanup(void) {
 void encode_leds_to_dma(struct ws2812_dev *dev) {
     // log
     LOG("+ Encoding LEDs to DMA buffer (SIZE: %d).", WS2812_DMA_BUFFER_LEN);
-
-    // stop the pwm/dma transfer
-    stop_dma_and_pwm();
-
+    
     // get a pointer to the start of the dma buffer
     uint32_t *dma_buf = dev->dma_buffer;
     memset(dma_buf, 0, WS2812_DMA_BUFFER_LEN * sizeof(uint32_t));
@@ -518,9 +502,6 @@ void encode_leds_to_dma(struct ws2812_dev *dev) {
     for (int b = 0; b < WS2812_RESET_LATCH_BITS; b++) {
         *dma_buf++ = 0;
     }
-
-    // restart the dma transfer
-    restart_dma_transfer();
 }
 
 static void log_dma_buffer_for_all_leds(struct ws2812_dev *dev) {
@@ -604,8 +585,12 @@ static int ws2812_probe(struct platform_device *pdev) {
         ws2812_device.leds[i].red   = test_colors[i][0];
         ws2812_device.leds[i].blue  = test_colors[i][2];
     }
+
+    // update the LED strip
+    stop_dma_transfer();
     encode_leds_to_dma(&ws2812_device);
     log_dma_buffer_for_all_leds(&ws2812_device);
+    start_dma_transfer();
 
     // success
     return 0;
