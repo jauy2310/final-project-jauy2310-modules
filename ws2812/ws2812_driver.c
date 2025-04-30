@@ -41,7 +41,9 @@ static int ws2812_open(struct inode *inode, struct file *file) {
 // write function
 static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos) {
     char color_str[8] = {0};
-    uint8_t first, second, third;
+    uint8_t red, green, blue;
+
+    struct ws2812_dev *dev = file->private_data;
 
     if (count < 7) {
         return -EINVAL;
@@ -56,18 +58,19 @@ static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t co
     }
 
     // parse hex RGB values
-    if (sscanf(color_str + 1, "%02hhx%02hhx%02hhx", &first, &second, &third) != 3) {
+    if (sscanf(color_str + 1, "%02hhx%02hhx%02hhx", &red, &green, &blue) != 3) {
         return -EINVAL;
     }
 
-    LOG("Set LED strip to #%02X%02X%02X", first, second, third);
+    LOG("Set LED strip to #%02X%02X%02X", red, green, blue);
 
     // set all LEDs to same color
     for (int i = 0; i < WS2812_MAX_LEDS; i++) {
-        ws2812_device.leds[i].red   = second;
-        ws2812_device.leds[i].green = first;
-        ws2812_device.leds[i].blue  = third;
+        dev->leds[i].red = red;
+        dev->leds[i].green = green;
+        dev->leds[i].blue = blue;
     }
+    log_dma_buffer_for_all_leds(ws2812_dev);
 
     // encode LED array to DMA buffer
     encode_leds_to_dma(&ws2812_device);
