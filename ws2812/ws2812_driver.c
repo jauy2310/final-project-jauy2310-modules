@@ -248,7 +248,7 @@ static int pwm_configure(void) {
 
     // configure the DMAC register
     LOG("+ Configuring DMAC register.");
-    *pwm_dmac |= PWM_DMAC_ENAB(1) | (0x7 << 8) | 0x7;
+    *pwm_dmac |= PWM_DMAC_ENAB(1) | (0x7 << 8) | 0x2;
     LOG("+ PWM_DMAC [%p]: 0x%08X", pwm_dmac, *pwm_dmac);
     
     // configure the RNG1 register
@@ -383,7 +383,7 @@ static void start_dma_transfer(void) {
     *dma_conblkad = ws2812_device.cb_phys;
 
     // enable PWM DMA requests
-    *pwm_dmac = PWM_DMAC_ENAB(1) | (0x7 << 8) | (0x4);  // PANIC=7, DREQ=4
+    *pwm_dmac = PWM_DMAC_ENAB(1) | (0x7 << 8) | (0x2);
 
     // enable DMA first, then PWM
     *dma_cs |= DMA_CS_ACTIVE(1);
