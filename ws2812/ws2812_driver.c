@@ -370,6 +370,7 @@ static void start_dma_transfer(void) {
     volatile unsigned int *pwm_dmac     = PWM_REG(PWM_DMAC_OFFSET);
 
     // Re-fill the control block (REQUIRED after DMA reset)
+    memset(ws2812_device.dma_cb, 0, sizeof(dma_cb_t));
     ws2812_device.dma_cb->ti        = DMA_TI_SRCINC(1) | DMA_TI_DESTDREQ(1) | DMA_TI_PERMAP(DMA_PERMAP_PWM);
     ws2812_device.dma_cb->source_ad = ws2812_device.dma_buffer_phys;
     ws2812_device.dma_cb->dest_ad   = PWM_BUS_BASE_ADDRESS + PWM_FIF1_OFFSET;
