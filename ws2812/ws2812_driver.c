@@ -73,6 +73,7 @@ static ssize_t ws2812_write(struct file *file, const char __user *buf, size_t co
 
     // encode LED array to DMA buffer
     stop_dma_transfer();
+    udelay(DELAY_LONG);
     encode_leds_to_dma(dev);
     start_dma_transfer();
 
@@ -248,7 +249,7 @@ static int pwm_configure(void) {
 
     // configure the DMAC register
     LOG("+ Configuring DMAC register.");
-    *pwm_dmac |= PWM_DMAC_ENAB(1) | (0x5 << 8) | 0x2;
+    *pwm_dmac |= PWM_DMAC_ENAB(1) | (0x3 << 8) | (0x1);
     LOG("+ PWM_DMAC [%p]: 0x%08X", pwm_dmac, *pwm_dmac);
     
     // configure the RNG1 register
@@ -382,7 +383,7 @@ static void start_dma_transfer(void) {
     *dma_conblkad = ws2812_device.cb_phys;
 
     // enable PWM DMA requests
-    *pwm_dmac = PWM_DMAC_ENAB(1) | (0x5 << 8) | (0x2);
+    *pwm_dmac = PWM_DMAC_ENAB(1) | (0x3 << 8) | (0x1);
 
     // enable DMA first, then PWM
     *dma_cs |= DMA_CS_ACTIVE(1);
@@ -514,6 +515,11 @@ void encode_leds_to_dma(struct ws2812_dev *dev) {
     for (int b = 0; b < WS2812_RESET_LATCH_BITS; b++) {
         dev->dma_buffer[word_index++] = 0;
     }
+
+    // TODO: remove
+    for (int i = 0; i < 48; i++) {
+        LOG("dma[%d] = %3u", i, dev->dma_buffer[i]);
+    }
 }
 
 static void log_dma_buffer_for_all_leds(struct ws2812_dev *dev) {
@@ -594,6 +600,7 @@ static int ws2812_probe(struct platform_device *pdev) {
 
     // update the LED strip
     stop_dma_transfer();
+    udelay(DELAY_LONG);
     encode_leds_to_dma(&ws2812_device);
     start_dma_transfer();
 
