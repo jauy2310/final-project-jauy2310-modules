@@ -409,6 +409,9 @@ static void stop_dma_transfer(void) {
     volatile unsigned int *pwm_ctl   = PWM_REG(PWM_CTL_OFFSET);
     volatile unsigned int *dma_debug = DMA_REG(DMA_DEBUG_OFFSET);
 
+    // print out DEBUG register
+    LOG("+ [Pre-DMA restart] DMA DEBUG: 0x%08X", *dma_debug);
+
     // disable PWM
     *pwm_ctl &= ~PWM_CTL_PWEN1_MASK;
     udelay(DELAY_SHORT);
