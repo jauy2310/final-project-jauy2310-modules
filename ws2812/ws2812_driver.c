@@ -377,8 +377,6 @@ static void start_dma_transfer(void) {
     ws2812_device.dma_cb->stride    = 0;
     ws2812_device.dma_cb->nextconbk = 0;
 
-    *dma_conblkad = ws2812_device.cb_phys;
-
     // set control block address
     *dma_conblkad = ws2812_device.cb_phys;
 
@@ -388,6 +386,7 @@ static void start_dma_transfer(void) {
     // enable DMA first, then PWM
     *dma_cs |= DMA_CS_ACTIVE(1);
     udelay(DELAY_SHORT);
+    *pwm_ctl |= PWM_CTL_USEF1(1) | PWM_CTL_MSEN1(1);
     *pwm_ctl |= PWM_CTL_PWEN1(1);
 
     // Log final state
